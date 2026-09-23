@@ -1,0 +1,39 @@
+# Entorno virtual
+venv_larvas/
+venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# macOS
+.DS_Store
+
+# Entrenamientos y modelos
+runs/
+*.pt
+*.pth
+*.onnx
+*.mlpackage
+
+# Librerias compiladas
+*.so
+*.dylib
+*.dll
+
+# Datasets (no subir a GitHub, compartir por Drive o Roboflow)
+Larvas/
+larva/
+
+# Datos privados
+datos_larvas.xlsx
+calibracion.json
+modelo_peso.json
+
+# Comprimidos
+*.zip
+*.tar
