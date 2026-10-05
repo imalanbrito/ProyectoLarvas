@@ -13,13 +13,10 @@ class DetectorLarvas:
         self.conf = conf
         self.cap = None
         self.tracker_config = 'bytetrack.yaml'
+        self.ancho_deseado = 1280
+        self.alto_deseado = 720
 
     def listar_camaras(self, max_test=5):
-        """
-        Devuelve una lista de indices de camaras disponibles.
-        En macOS, usa el backend AVFoundation para que funcione bien.
-        Prueba varios indices porque el orden puede cambiar.
-        """
         disponibles = []
         for i in range(max_test):
             cap = cv2.VideoCapture(i, cv2.CAP_AVFOUNDATION)
@@ -31,15 +28,22 @@ class DetectorLarvas:
         return disponibles
 
     def abrir_camara(self, indice=0):
-        """
-        Abre la camara en el indice indicado usando AVFoundation.
-        """
         if self.cap is not None:
             self.cap.release()
         self.cap = cv2.VideoCapture(indice, cv2.CAP_AVFOUNDATION)
+
+        # Forzar resolucion deseada
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.ancho_deseado)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.alto_deseado)
+
         if not self.cap.isOpened():
             print(f"No se pudo abrir la camara {indice}")
             return False
+
+        # Confirmar que la camara acepto la resolucion
+        ancho_real = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        alto_real = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(f"Camara {indice} abierta a {ancho_real}x{alto_real}")
         return True
 
     def cerrar_camara(self):
@@ -56,18 +60,6 @@ class DetectorLarvas:
         return frame
 
     def detectar_con_tracking(self, frame):
-        """
-        Ejecuta el modelo con tracking ByteTrack.
-
-        Devuelve una lista de diccionarios, uno por cada deteccion:
-            {
-                'id': int (ID unico del tracker),
-                'box': (x1, y1, x2, y2),
-                'conf': float,
-                'mask': numpy array binario o None,
-                'centro': (cx, cy)
-            }
-        """
         results = self.model.track(
             frame,
             conf=self.conf,
@@ -116,5 +108,4 @@ class DetectorLarvas:
         return detecciones
 
     def reset_tracker(self):
-        """Reinicia el estado del tracker para empezar una nueva sesion."""
         self.model.predictor = None

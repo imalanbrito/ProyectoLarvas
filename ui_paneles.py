@@ -5,20 +5,22 @@ from PIL import Image, ImageTk
 import numpy as np
 import math
 import os
-from datetime import datetime
 
 from core_detector import DetectorLarvas
 from core_medidor import calcular_medidas_desde_mascara
 from core_archivos import (
     cargar_calibracion,
     guardar_calibracion,
-    exportar_excel,
+    exportar_excel_por_captura,
     nueva_sesion_id
 )
 
 BASE_DIR = '/Users/alan/Desktop/LUMACAD/ProyectoLarvas'
 
 
+# ==========================================================
+# PANEL DE CALIBRACION
+# ==========================================================
 class PanelCalibracion(ttk.Frame):
     def __init__(self, parent, detector, on_calibracion_guardada):
         super().__init__(parent)
@@ -28,11 +30,10 @@ class PanelCalibracion(ttk.Frame):
         self.forma = tk.StringVar(value='r')
         self.capturando = False
         self.frame_actual = None
-
+        self.tk_img_actual = None
         self._construir_ui()
 
     def _construir_ui(self):
-        # Controles superiores
         top = ttk.Frame(self)
         top.pack(fill='x', padx=10, pady=10)
 
@@ -45,20 +46,20 @@ class PanelCalibracion(ttk.Frame):
         self.combo_camara.pack(side='left')
         self._refrescar_camaras()
 
-        ttk.Button(top, text="Refrescar camaras", command=self._refrescar_camaras).pack(side='left', padx=5)
+        ttk.Button(top, text="Refrescar", command=self._refrescar_camaras).pack(side='left', padx=5)
 
         self.btn_iniciar = ttk.Button(top, text="Iniciar calibracion", command=self._iniciar)
         self.btn_iniciar.pack(side='left', padx=10)
 
-        self.btn_guardar = ttk.Button(top, text="Guardar calibracion", command=self._guardar, state='disabled')
+        self.btn_guardar = ttk.Button(top, text="Guardar calibracion",
+                                       command=self._guardar, state='disabled')
         self.btn_guardar.pack(side='left', padx=10)
 
-        # Canvas de video
-        self.canvas = tk.Canvas(self, width=800, height=600, bg='black')
-        self.canvas.pack(padx=10, pady=10)
+        self.canvas = tk.Canvas(self, bg='black')
+        self.canvas.pack(fill='both', expand=True, padx=10, pady=10)
         self.canvas.bind('<Button-1>', self._click_canvas)
+        self.canvas.bind('<Configure>', self._on_canvas_resize)
 
-        # Formulario de distancias reales
         form = ttk.Frame(self)
         form.pack(fill='x', padx=10, pady=10)
 
@@ -93,7 +94,7 @@ class PanelCalibracion(ttk.Frame):
             return
         self.puntos = []
         self.capturando = True
-        self.label_estado.config(text="Haz clic en los puntos. R reinicia, Q termina.")
+        self.label_estado.config(text="Haz clic en los puntos. El programa se detiene al completar.")
         self._loop()
 
     def _loop(self):
@@ -101,6 +102,7 @@ class PanelCalibracion(ttk.Frame):
             return
         frame = self.detector.leer_frame()
         if frame is None:
+            self.after(30, self._loop)
             return
         self.frame_actual = frame.copy()
         self._dibujar()
@@ -126,25 +128,55 @@ class PanelCalibracion(ttk.Frame):
         self._mostrar_en_canvas(copia)
 
     def _mostrar_en_canvas(self, frame_bgr):
-        # Asegurar que el frame tenga 3 canales (BGR)
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+        if cw < 10 or ch < 10:
+            return
+
         if len(frame_bgr.shape) == 2:
             frame_bgr = cv2.cvtColor(frame_bgr, cv2.COLOR_GRAY2BGR)
         elif frame_bgr.shape[2] == 4:
             frame_bgr = cv2.cvtColor(frame_bgr, cv2.COLOR_BGRA2BGR)
 
-        # Convertir BGR a RGB para Pillow
-        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        h_orig, w_orig = frame_bgr.shape[:2]
+        escala = min(cw / w_orig, ch / h_orig)
+        nuevo_w = int(w_orig * escala)
+        nuevo_h = int(h_orig * escala)
+
+        frame_redim = cv2.resize(frame_bgr, (nuevo_w, nuevo_h))
+        rgb = cv2.cvtColor(frame_redim, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(rgb)
-        img = img.resize((800, 600))
-        self.tk_img = ImageTk.PhotoImage(img)
-        self.canvas.create_image(0, 0, anchor='nw', image=self.tk_img)
+
+        fondo = Image.new('RGB', (cw, ch), (0, 0, 0))
+        fondo.paste(img, ((cw - nuevo_w) // 2, (ch - nuevo_h) // 2))
+
+        self.tk_img_actual = ImageTk.PhotoImage(fondo)
+        self.canvas.delete("all")
+        self.canvas.create_image(0, 0, anchor='nw', image=self.tk_img_actual)
+
+    def _on_canvas_resize(self, event):
+        if self.frame_actual is not None:
+            self._dibujar()
 
     def _click_canvas(self, event):
-        if not self.capturando:
+        if not self.capturando or self.frame_actual is None:
             return
-        # Convertir coordenadas del canvas a coordenadas del frame original
-        x = int(event.x * self.frame_actual.shape[1] / 800)
-        y = int(event.y * self.frame_actual.shape[0] / 600)
+
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+        h_orig, w_orig = self.frame_actual.shape[:2]
+        escala = min(cw / w_orig, ch / h_orig)
+        nuevo_w = int(w_orig * escala)
+        nuevo_h = int(h_orig * escala)
+        offset_x = (cw - nuevo_w) // 2
+        offset_y = (ch - nuevo_h) // 2
+
+        x = int((event.x - offset_x) / escala)
+        y = int((event.y - offset_y) / escala)
+
+        if x < 0 or y < 0 or x >= w_orig or y >= h_orig:
+            return
+
         self.puntos.append((x, y))
         print(f"Punto {len(self.puntos)}: ({x}, {y})")
 
@@ -196,24 +228,28 @@ class PanelCalibracion(ttk.Frame):
 
             guardar_calibracion(datos)
             self.on_calibracion_guardada(datos)
-            messagebox.showinfo("Calibracion", f"Guardada. Factor: {factor:.4f} cm/px, Area: {area:.2f} cm2")
+            messagebox.showinfo("Calibracion",
+                                f"Guardada. Factor: {factor:.4f} cm/px, Area: {area:.2f} cm2")
         except ValueError:
             messagebox.showerror("Error", "Ingresa valores numericos validos.")
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
 
+# ==========================================================
+# PANEL DE DETECCION
+# ==========================================================
 class PanelDeteccion(ttk.Frame):
-    def __init__(self, parent, detector, calibracion, on_registro_actualizado):
+    def __init__(self, parent, detector, calibracion, on_captura_registrada):
         super().__init__(parent)
         self.detector = detector
         self.calibracion = calibracion
-        self.on_registro_actualizado = on_registro_actualizado
-        self.activo = False
-        self.pausado = False
+        self.on_captura_registrada = on_captura_registrada
+
+        self.sesion = None
+        self.capturando = False
         self.frame_actual = None
-        self.sesion_id = None
-        self.larvas_vistas = {}  # id -> dict con medidas
+        self.tk_img_actual = None
 
         self._construir_ui()
 
@@ -228,23 +264,31 @@ class PanelDeteccion(ttk.Frame):
 
         ttk.Button(top, text="Refrescar", command=self._refrescar_camaras).pack(side='left', padx=5)
 
-        self.btn_iniciar = ttk.Button(top, text="Iniciar deteccion", command=self._iniciar)
+        ttk.Label(top, text="Intervalo (s):").pack(side='left', padx=(20, 5))
+        self.entry_intervalo = ttk.Entry(top, width=6)
+        self.entry_intervalo.insert(0, '10')
+        self.entry_intervalo.pack(side='left')
+
+        self.btn_iniciar = ttk.Button(top, text="Iniciar captura", command=self._iniciar)
         self.btn_iniciar.pack(side='left', padx=10)
 
-        self.btn_pausar = ttk.Button(top, text="Pausar", command=self._toggle_pausa, state='disabled')
+        self.btn_pausar = ttk.Button(top, text="Pausar",
+                                      command=self._toggle_pausa, state='disabled')
         self.btn_pausar.pack(side='left', padx=5)
 
-        self.btn_detener = ttk.Button(top, text="Detener", command=self._detener, state='disabled')
+        self.btn_detener = ttk.Button(top, text="Detener",
+                                       command=self._detener, state='disabled')
         self.btn_detener.pack(side='left', padx=5)
 
-        self.btn_registrar = ttk.Button(top, text="Registrar frame actual", command=self._registrar, state='disabled')
-        self.btn_registrar.pack(side='left', padx=10)
+        self.canvas = tk.Canvas(self, bg='black')
+        self.canvas.pack(fill='both', expand=True, padx=10, pady=10)
+        self.canvas.bind('<Configure>', self._on_canvas_resize)
 
-        self.canvas = tk.Canvas(self, width=800, height=600, bg='black')
-        self.canvas.pack(padx=10, pady=10)
-
-        self.label_estado = ttk.Label(self, text="Listo. Elige camara e inicia.")
+        self.label_estado = ttk.Label(self, text="Listo. Elige camara, intervalo e inicia.")
         self.label_estado.pack(padx=10, pady=5, anchor='w')
+
+        self.label_contador = ttk.Label(self, text="Capturas: 0 | Larvas acumuladas: 0")
+        self.label_contador.pack(padx=10, pady=5, anchor='w')
 
     def _refrescar_camaras(self):
         camaras = self.detector.listar_camaras()
@@ -256,67 +300,95 @@ class PanelDeteccion(ttk.Frame):
         self.calibracion = calib
 
     def _iniciar(self):
+        from core_sesion import SesionCaptura
+
         if not self.calibracion:
             messagebox.showwarning("Sin calibracion", "Primero calibra el contenedor.")
             return
         if not self.combo_camara.get():
             messagebox.showwarning("Sin camara", "No hay camaras.")
             return
+
+        try:
+            intervalo = float(self.entry_intervalo.get())
+            if intervalo <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Error", "El intervalo debe ser un numero positivo.")
+            return
+
         indice = int(self.combo_camara.get())
         if not self.detector.abrir_camara(indice):
             messagebox.showerror("Error", "No se pudo abrir la camara.")
             return
 
-        # Resetear tracker para nueva sesion
-        self.detector.reset_tracker()
-        self.sesion_id = nueva_sesion_id()
-        self.larvas_vistas = {}
-        self.activo = True
-        self.pausado = False
+        self.sesion = SesionCaptura(intervalo_segundos=intervalo, guardar_imagenes=True)
+        sesion_id = self.sesion.iniciar()
+        self.capturando = True
+
         self.btn_iniciar.config(state='disabled')
         self.btn_detener.config(state='normal')
         self.btn_pausar.config(state='normal')
-        self.btn_registrar.config(state='normal')
-        self.label_estado.config(text=f"Sesion: {self.sesion_id}")
+        self.label_estado.config(text=f"Sesion: {sesion_id} | Intervalo: {intervalo}s")
         self._loop()
 
     def _toggle_pausa(self):
-        self.pausado = not self.pausado
-        self.btn_pausar.config(text="Reanudar" if self.pausado else "Pausar")
+        if self.sesion is None:
+            return
+        if self.sesion.pausada:
+            self.sesion.reanudar()
+            self.btn_pausar.config(text="Pausar")
+        else:
+            self.sesion.pausar()
+            self.btn_pausar.config(text="Reanudar")
 
     def _detener(self):
-        self.activo = False
+        self.capturando = False
         self.detector.cerrar_camara()
+        if self.sesion:
+            self.sesion.detener()
         self.btn_iniciar.config(state='normal')
         self.btn_detener.config(state='disabled')
         self.btn_pausar.config(state='disabled')
-        self.btn_registrar.config(state='disabled')
         self.label_estado.config(text="Detenido.")
 
     def _loop(self):
-        if not self.activo:
-            return
-        if self.pausado:
-            self.after(50, self._loop)
+        if not self.capturando:
             return
 
-        frame = self.detector.leer_frame()
-        if frame is None:
-            self.after(50, self._loop)
-            return
+        if self.sesion and self.sesion.debe_capturar():
+            frame = self.detector.leer_frame()
+            if frame is not None:
+                self._procesar_captura(frame)
 
+        self.after(200, self._loop)
+
+    def _procesar_captura(self, frame):
         detecciones = self.detector.detectar_con_tracking(frame)
-        self.frame_actual = frame.copy()
-        self._dibujar(frame, detecciones)
 
-        self.after(30, self._loop)
+        detecciones_con_id_local = []
+        for i, d in enumerate(detecciones, start=1):
+            d['id_captura'] = i
+            detecciones_con_id_local.append(d)
+
+        self.frame_actual = frame.copy()
+        self._dibujar(self.frame_actual, detecciones_con_id_local)
+
+        registro = self.sesion.registrar_captura(self.frame_actual, detecciones_con_id_local)
+
+        self.on_captura_registrada(registro)
+
+        total_larvas = sum(c['n_larvas'] for c in self.sesion.capturas)
+        self.label_contador.config(
+            text=f"Capturas: {self.sesion.numero_captura} | Larvas acumuladas: {total_larvas}"
+        )
+        print(f"Captura {registro['numero']} - {registro['n_larvas']} larvas - {registro['hora_captura']}")
 
     def _dibujar(self, frame, detecciones):
         factor = self.calibracion['factor_escala']
         forma = self.calibracion['forma']
         puntos = self.calibracion['puntos']
 
-        # Dibujar contenedor
         if forma == 'r':
             pts = np.array(puntos, np.int32).reshape((-1, 1, 2))
             cv2.polylines(frame, [pts], True, (0, 255, 255), 2)
@@ -324,66 +396,66 @@ class PanelDeteccion(ttk.Frame):
             radio = int(math.dist(puntos[0], puntos[1]))
             cv2.circle(frame, tuple(puntos[0]), radio, (0, 255, 255), 2)
 
-        # Dibujar detecciones
         for d in detecciones:
             x1, y1, x2, y2 = d['box']
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, f"ID {d['id']}", (x1, y1 - 10),
+            cv2.putText(frame, f"ID {d['id_captura']}", (x1, y1 - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
             if d['mask'] is not None:
                 medidas = calcular_medidas_desde_mascara(d['mask'], factor)
                 if medidas:
+                    d['medidas'] = medidas
                     cv2.putText(frame, f"L:{medidas['largo_cm']:.2f} A:{medidas['ancho_cm']:.2f}",
                                 (x1, y2 + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
                     cv2.putText(frame, f"P:{medidas['peso_g']:.4f}g",
                                 (x1, y2 + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-                    # Guardar para registro
-                    self.larvas_vistas[d['id']] = medidas
 
-        cv2.putText(frame, f"Larvas: {len(detecciones)} | Registradas: {len(self.larvas_vistas)}",
+        cv2.putText(frame, f"Captura {self.sesion.numero_captura} | Larvas: {len(detecciones)}",
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
         self._mostrar_en_canvas(frame)
 
     def _mostrar_en_canvas(self, frame_bgr):
-        # Asegurar que el frame tenga 3 canales (BGR)
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+        if cw < 10 or ch < 10:
+            return
+
         if len(frame_bgr.shape) == 2:
             frame_bgr = cv2.cvtColor(frame_bgr, cv2.COLOR_GRAY2BGR)
         elif frame_bgr.shape[2] == 4:
             frame_bgr = cv2.cvtColor(frame_bgr, cv2.COLOR_BGRA2BGR)
 
-        # Convertir BGR a RGB para Pillow
-        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        h_orig, w_orig = frame_bgr.shape[:2]
+        escala = min(cw / w_orig, ch / h_orig)
+        nuevo_w = int(w_orig * escala)
+        nuevo_h = int(h_orig * escala)
+
+        frame_redim = cv2.resize(frame_bgr, (nuevo_w, nuevo_h))
+        rgb = cv2.cvtColor(frame_redim, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(rgb)
-        img = img.resize((800, 600))
-        self.tk_img = ImageTk.PhotoImage(img)
-        self.canvas.create_image(0, 0, anchor='nw', image=self.tk_img)
 
-    def _registrar(self):
-        if not self.larvas_vistas:
-            messagebox.showinfo("Registro", "No hay larvas detectadas aun.")
-            return
+        fondo = Image.new('RGB', (cw, ch), (0, 0, 0))
+        fondo.paste(img, ((cw - nuevo_w) // 2, (ch - nuevo_h) // 2))
 
-        registros = []
-        for id_larva, medidas in self.larvas_vistas.items():
-            registros.append({
-                'sesion': self.sesion_id,
-                'id_larva': id_larva,
-                'largo_cm': medidas['largo_cm'],
-                'ancho_cm': medidas['ancho_cm'],
-                'peso_g': medidas['peso_g']
-            })
+        self.tk_img_actual = ImageTk.PhotoImage(fondo)
+        self.canvas.delete("all")
+        self.canvas.create_image(0, 0, anchor='nw', image=self.tk_img_actual)
 
-        self.on_registro_actualizado(registros)
-        messagebox.showinfo("Registro", f"Se registraron {len(registros)} larvas de la sesion.")
+    def _on_canvas_resize(self, event):
+        if self.frame_actual is not None:
+            self._dibujar(self.frame_actual, [])
 
 
+# ==========================================================
+# PANEL DE REGISTRO
+# ==========================================================
 class PanelRegistro(ttk.Frame):
     def __init__(self, parent, on_exportar):
         super().__init__(parent)
         self.on_exportar = on_exportar
-        self.registro_global = []
+        self.capturas_globales = []
         self._construir_ui()
 
     def _construir_ui(self):
@@ -393,36 +465,52 @@ class PanelRegistro(ttk.Frame):
         ttk.Button(top, text="Exportar a Excel", command=self._exportar).pack(side='left')
         ttk.Button(top, text="Limpiar registro", command=self._limpiar).pack(side='left', padx=10)
 
-        self.label_total = ttk.Label(top, text="Total: 0 filas")
+        self.label_total = ttk.Label(top, text="Capturas: 0 | Filas: 0")
         self.label_total.pack(side='left', padx=20)
 
-        columnas = ('sesion', 'id_larva', 'largo_cm', 'ancho_cm', 'peso_g')
+        columnas = ('captura', 'hora', 'id_larva', 'largo_cm', 'ancho_cm', 'peso_g', 'ubicacion')
         self.tabla = ttk.Treeview(self, columns=columnas, show='headings')
-        self.tabla.heading('sesion', text='Sesion')
+        self.tabla.heading('captura', text='Captura')
+        self.tabla.heading('hora', text='Hora')
         self.tabla.heading('id_larva', text='Numero de larva')
         self.tabla.heading('largo_cm', text='Largo (cm)')
         self.tabla.heading('ancho_cm', text='Ancho (cm)')
         self.tabla.heading('peso_g', text='Peso aprox (g)')
+        self.tabla.heading('ubicacion', text='Ubicacion de la captura')
 
-        self.tabla.column('sesion', width=180)
-        self.tabla.column('id_larva', width=120)
-        self.tabla.column('largo_cm', width=100)
-        self.tabla.column('ancho_cm', width=100)
-        self.tabla.column('peso_g', width=120)
+        self.tabla.column('captura', width=70)
+        self.tabla.column('hora', width=90)
+        self.tabla.column('id_larva', width=110)
+        self.tabla.column('largo_cm', width=90)
+        self.tabla.column('ancho_cm', width=90)
+        self.tabla.column('peso_g', width=110)
+        self.tabla.column('ubicacion', width=250)
 
         self.tabla.pack(fill='both', expand=True, padx=10, pady=10)
 
-    def agregar_registros(self, registros):
-        for r in registros:
-            self.registro_global.append(r)
+    def agregar_captura(self, captura):
+        self.capturas_globales.append(captura)
+        ubicacion = captura.get('ruta_relativa', '')
+        for d in captura['detecciones']:
+            if 'medidas' not in d:
+                continue
             self.tabla.insert('', 'end', values=(
-                r['sesion'], r['id_larva'], r['largo_cm'], r['ancho_cm'], r['peso_g']
+                captura['numero'],
+                captura['hora_captura'],
+                d['id_captura'],
+                d['medidas']['largo_cm'],
+                d['medidas']['ancho_cm'],
+                d['medidas']['peso_g'],
+                ubicacion
             ))
-        self.label_total.config(text=f"Total: {len(self.registro_global)} filas")
+        total_filas = sum(c['n_larvas'] for c in self.capturas_globales)
+        self.label_total.config(
+            text=f"Capturas: {len(self.capturas_globales)} | Filas: {total_filas}"
+        )
 
     def _exportar(self):
-        if not self.registro_global:
-            messagebox.showinfo("Exportar", "No hay datos para exportar.")
+        if not self.capturas_globales:
+            messagebox.showinfo("Exportar", "No hay capturas para exportar.")
             return
         ruta = filedialog.asksaveasfilename(
             defaultextension='.xlsx',
@@ -430,11 +518,11 @@ class PanelRegistro(ttk.Frame):
             initialfile='registro_larvas.xlsx'
         )
         if ruta:
-            self.on_exportar(self.registro_global, ruta)
+            self.on_exportar(self.capturas_globales, ruta)
 
     def _limpiar(self):
         if messagebox.askyesno("Limpiar", "Borrar todo el registro?"):
-            self.registro_global = []
+            self.capturas_globales = []
             for item in self.tabla.get_children():
                 self.tabla.delete(item)
-            self.label_total.config(text="Total: 0 filas")
+            self.label_total.config(text="Capturas: 0 | Filas: 0")

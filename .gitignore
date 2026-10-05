@@ -37,3 +37,5 @@ modelo_peso.json
 # Comprimidos
 *.zip
 *.tar.gz
+
+capturas/

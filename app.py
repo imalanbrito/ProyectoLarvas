@@ -1,10 +1,9 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import os
 
 from ui_paneles import PanelCalibracion, PanelDeteccion, PanelRegistro
 from core_detector import DetectorLarvas
-from core_archivos import cargar_calibracion, exportar_excel
+from core_archivos import cargar_calibracion, exportar_excel_por_captura
 
 
 BASE_DIR = '/Users/alan/Desktop/LUMACAD/ProyectoLarvas'
@@ -15,7 +14,8 @@ class AplicacionLarvas:
     def __init__(self, root):
         self.root = root
         self.root.title("Proyecto Larvas - Deteccion y Medicion")
-        self.root.geometry("900x800")
+        self.root.geometry("1000x800")
+        self.root.minsize(800, 600)
 
         self.detector = DetectorLarvas(model_path=MODEL_PATH)
         self.calibracion = cargar_calibracion()
@@ -30,7 +30,7 @@ class AplicacionLarvas:
             notebook, self.detector, self._on_calibracion_guardada
         )
         self.panel_deteccion = PanelDeteccion(
-            notebook, self.detector, self.calibracion, self._on_registro_actualizado
+            notebook, self.detector, self.calibracion, self._on_captura_registrada
         )
         self.panel_registro = PanelRegistro(notebook, self._on_exportar)
 
@@ -42,12 +42,12 @@ class AplicacionLarvas:
         self.calibracion = datos
         self.panel_deteccion.actualizar_calibracion(datos)
 
-    def _on_registro_actualizado(self, registros):
-        self.panel_registro.agregar_registros(registros)
+    def _on_captura_registrada(self, captura):
+        self.panel_registro.agregar_captura(captura)
 
-    def _on_exportar(self, registro, ruta):
+    def _on_exportar(self, capturas, ruta):
         try:
-            exportar_excel(registro, ruta)
+            exportar_excel_por_captura(capturas, ruta)
             messagebox.showinfo("Exportar", f"Exportado en:\n{ruta}")
         except Exception as e:
             messagebox.showerror("Error", str(e))
