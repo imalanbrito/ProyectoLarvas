@@ -7,6 +7,25 @@ BASE_DIR = '/Users/alan/Desktop/LUMACAD/ProyectoLarvas'
 MODEL_PATH = f'{BASE_DIR}/runs/larvas_v1/weights/best.pt'
 
 
+def crear_mascara_roi(shape, forma, puntos):
+    """Crea una mascara binaria con la forma del contenedor calibrado."""
+    mask = np.zeros(shape[:2], dtype=np.uint8)
+    if forma == 'r':
+        pts = np.array(puntos, np.int32).reshape((-1, 1, 2))
+        cv2.fillPoly(mask, [pts], 255)
+    elif forma == 'c':
+        radio_px = int(np.linalg.norm(np.array(puntos[1]) - np.array(puntos[0])))
+        cv2.circle(mask, tuple(puntos[0]), radio_px, 255, -1)
+    return mask
+
+
+def punto_dentro_roi(roi_mask, x, y):
+    """Devuelve True si el punto (x, y) cae dentro del ROI."""
+    if x < 0 or y < 0 or x >= roi_mask.shape[1] or y >= roi_mask.shape[0]:
+        return False
+    return roi_mask[int(y), int(x)] > 0
+
+
 class DetectorLarvas:
     def __init__(self, model_path=MODEL_PATH, conf=0.15):
         self.model = YOLO(model_path)
@@ -31,16 +50,11 @@ class DetectorLarvas:
         if self.cap is not None:
             self.cap.release()
         self.cap = cv2.VideoCapture(indice, cv2.CAP_AVFOUNDATION)
-
-        # Forzar resolucion deseada
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.ancho_deseado)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.alto_deseado)
-
         if not self.cap.isOpened():
             print(f"No se pudo abrir la camara {indice}")
             return False
-
-        # Confirmar que la camara acepto la resolucion
         ancho_real = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         alto_real = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print(f"Camara {indice} abierta a {ancho_real}x{alto_real}")
@@ -59,7 +73,11 @@ class DetectorLarvas:
             return None
         return frame
 
-    def detectar_con_tracking(self, frame):
+    def detectar_con_tracking(self, frame, roi_mask=None):
+        """
+        Ejecuta el modelo con tracking ByteTrack.
+        Si se pasa roi_mask, filtra las detecciones cuyo centro cae fuera del ROI.
+        """
         results = self.model.track(
             frame,
             conf=self.conf,
@@ -91,11 +109,27 @@ class DetectorLarvas:
                 cx = int((x1 + x2) / 2)
                 cy = int((y1 + y2) / 2)
 
+                # Filtrar por ROI si se proporciono
+                if roi_mask is not None and not punto_dentro_roi(roi_mask, cx, cy):
+                    continue
+
                 mask_bin = None
                 if masks_np is not None and i < len(masks_np):
                     m = masks_np[i]
                     m = cv2.resize(m, (frame.shape[1], frame.shape[0]))
                     mask_bin = (m > 0.5).astype(np.uint8) * 255
+
+                    # Filtrar tambien la mascara por su centroide
+                    if roi_mask is not None:
+                        contornos, _ = cv2.findContours(mask_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                        if contornos:
+                            cnt = max(contornos, key=cv2.contourArea)
+                            M = cv2.moments(cnt)
+                            if M["m00"] > 0:
+                                mcx = int(M["m10"] / M["m00"])
+                                mcy = int(M["m01"] / M["m00"])
+                                if not punto_dentro_roi(roi_mask, mcx, mcy):
+                                    continue
 
                 detecciones.append({
                     'id': id_larva,
