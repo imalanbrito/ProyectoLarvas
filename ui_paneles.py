@@ -92,6 +92,7 @@ class PanelCalibracion(ttk.Frame):
         if not self.detector.abrir_camara(indice):
             messagebox.showerror("Error", f"No se pudo abrir la camara {indice}")
             return
+        # No se reinicia el zoom si la camara ya estaba abierta
         self.puntos = []
         self.capturando = True
         self.label_estado.config(text="Haz clic en los puntos. El programa se detiene al completar.")
@@ -170,7 +171,7 @@ class PanelCalibracion(ttk.Frame):
         limite = 4 if self.forma.get() == 'r' else 2
         if len(self.puntos) == limite:
             self.capturando = False
-            self.detector.cerrar_camara()
+            # NO cerramos la camara, asi el zoom se mantiene
             self.label_estado.config(text=f"{limite} puntos capturados. Ingresa distancias reales y guarda.")
             self.btn_guardar.config(state='normal')
 
@@ -266,6 +267,10 @@ class PanelDeteccion(ttk.Frame):
                                        command=self._detener, state='disabled')
         self.btn_detener.pack(side='left', padx=5)
 
+        self.btn_cerrar_cam = ttk.Button(top, text="Cerrar camara",
+                                          command=self._cerrar_camara)
+        self.btn_cerrar_cam.pack(side='left', padx=5)
+
         self.canvas = tk.Canvas(self, bg='black')
         self.canvas.pack(fill='both', expand=True, padx=10, pady=10)
         self.canvas.bind('<Configure>', self._on_canvas_resize)
@@ -284,7 +289,7 @@ class PanelDeteccion(ttk.Frame):
 
     def actualizar_calibracion(self, calib):
         self.calibracion = calib
-        self.roi_mask = None  # forzar recalculo en el proximo frame
+        self.roi_mask = None
 
     def _construir_roi(self, frame):
         if self.calibracion is None:
@@ -346,6 +351,20 @@ class PanelDeteccion(ttk.Frame):
             self.btn_pausar.config(text="Reanudar")
 
     def _detener(self):
+        # Detiene el muestreo pero NO cierra la camara
+        self.modo = 'idle'
+        if self.sesion:
+            self.sesion.detener()
+            self.sesion = None
+        self.btn_preview.config(state='normal')
+        self.btn_muestreo.config(state='disabled')
+        self.btn_pausar.config(state='disabled')
+        self.btn_pausar.config(text="Pausar")
+        self.btn_detener.config(state='disabled')
+        self.label_estado.config(text="Muestreo detenido. La camara sigue abierta con el zoom actual.")
+
+    def _cerrar_camara(self):
+        # Cierra la camara explicitamente
         self.modo = 'idle'
         self.detector.cerrar_camara()
         if self.sesion:
@@ -356,9 +375,9 @@ class PanelDeteccion(ttk.Frame):
         self.btn_pausar.config(state='disabled')
         self.btn_pausar.config(text="Pausar")
         self.btn_detener.config(state='disabled')
-        self.label_estado.config(text="Detenido.")
+        self.label_estado.config(text="Camara cerrada.")
 
-    # ------- Modo preview: video en vivo -------
+    # ------- Modo preview -------
     def _loop_preview(self):
         if self.modo != 'preview':
             return
@@ -375,7 +394,7 @@ class PanelDeteccion(ttk.Frame):
         self._dibujar(self.frame_actual, detecciones, modo='preview')
         self.after(30, self._loop_preview)
 
-    # ------- Modo captura: fotos periodicas -------
+    # ------- Modo captura -------
     def _loop_captura(self):
         if self.modo != 'captura':
             return
@@ -414,13 +433,11 @@ class PanelDeteccion(ttk.Frame):
         forma = self.calibracion['forma']
         puntos = self.calibracion['puntos']
 
-        # Oscurecer fuera del ROI
         if self.roi_mask is not None:
             overlay = frame.copy()
             overlay[self.roi_mask == 0] = (overlay[self.roi_mask == 0] * 0.4).astype(np.uint8)
             frame[:] = overlay
 
-        # Contorno del contenedor
         if forma == 'r':
             pts = np.array(puntos, np.int32).reshape((-1, 1, 2))
             cv2.polylines(frame, [pts], True, (0, 255, 255), 2)
@@ -428,7 +445,6 @@ class PanelDeteccion(ttk.Frame):
             radio = int(math.dist(puntos[0], puntos[1]))
             cv2.circle(frame, tuple(puntos[0]), radio, (0, 255, 255), 2)
 
-        # Detecciones
         for d in detecciones:
             x1, y1, x2, y2 = d['box']
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)

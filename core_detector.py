@@ -31,6 +31,7 @@ class DetectorLarvas:
         self.model = YOLO(model_path)
         self.conf = conf
         self.cap = None
+        self._indice_actual = None
         self.tracker_config = 'bytetrack.yaml'
         self.ancho_deseado = 1280
         self.alto_deseado = 720
@@ -46,15 +47,26 @@ class DetectorLarvas:
             cap.release()
         return disponibles
 
+    def esta_abierta(self):
+        return self.cap is not None and self.cap.isOpened()
+
     def abrir_camara(self, indice=0):
+        # Si ya esta abierta con el mismo indice, no reiniciar (conserva el zoom)
+        if self.cap is not None and self._indice_actual == indice and self.cap.isOpened():
+            return True
+
         if self.cap is not None:
             self.cap.release()
+
         self.cap = cv2.VideoCapture(indice, cv2.CAP_AVFOUNDATION)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.ancho_deseado)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.alto_deseado)
+
         if not self.cap.isOpened():
             print(f"No se pudo abrir la camara {indice}")
             return False
+
+        self._indice_actual = indice
         ancho_real = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         alto_real = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print(f"Camara {indice} abierta a {ancho_real}x{alto_real}")
@@ -64,6 +76,8 @@ class DetectorLarvas:
         if self.cap is not None:
             self.cap.release()
             self.cap = None
+            self._indice_actual = None
+            print("Camara cerrada.")
 
     def leer_frame(self):
         if self.cap is None:
@@ -74,10 +88,6 @@ class DetectorLarvas:
         return frame
 
     def detectar_con_tracking(self, frame, roi_mask=None):
-        """
-        Ejecuta el modelo con tracking ByteTrack.
-        Si se pasa roi_mask, filtra las detecciones cuyo centro cae fuera del ROI.
-        """
         results = self.model.track(
             frame,
             conf=self.conf,
@@ -109,7 +119,6 @@ class DetectorLarvas:
                 cx = int((x1 + x2) / 2)
                 cy = int((y1 + y2) / 2)
 
-                # Filtrar por ROI si se proporciono
                 if roi_mask is not None and not punto_dentro_roi(roi_mask, cx, cy):
                     continue
 
@@ -119,7 +128,6 @@ class DetectorLarvas:
                     m = cv2.resize(m, (frame.shape[1], frame.shape[0]))
                     mask_bin = (m > 0.5).astype(np.uint8) * 255
 
-                    # Filtrar tambien la mascara por su centroide
                     if roi_mask is not None:
                         contornos, _ = cv2.findContours(mask_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                         if contornos:

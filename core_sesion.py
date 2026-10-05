@@ -63,7 +63,6 @@ class SesionCaptura:
             nombre = f"captura_{self.numero_captura:03d}_{hora_captura}.jpg"
             ruta_img = os.path.join(CAPTURAS_DIR, nombre)
             cv2.imwrite(ruta_img, frame)
-            # Ruta relativa a la carpeta del proyecto, para el Excel
             ruta_relativa = os.path.join('capturas', nombre)
 
         registro_captura = {
