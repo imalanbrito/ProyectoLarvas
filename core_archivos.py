@@ -1,10 +1,11 @@
+import csv
 import json
 import os
 from datetime import datetime
 import pandas as pd
 
 
-BASE_DIR = '/Users/alan/Desktop/LUMACAD/ProyectoLarvas'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CALIB_PATH = os.path.join(BASE_DIR, 'calibracion.json')
 
 
@@ -59,6 +60,24 @@ def exportar_excel_por_captura(capturas, ruta_salida=None):
 
     print(f"Excel exportado en {ruta_salida}")
     return ruta_salida
+
+
+def agregar_captura_csv(ruta_csv, captura):
+    """Agrega las filas de una captura al CSV de la sesion (crea el encabezado si es nuevo)."""
+    nuevo = not os.path.exists(ruta_csv)
+    with open(ruta_csv, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if nuevo:
+            writer.writerow(['Captura', 'Fecha y hora', 'Numero de larva', 'Largo de larva (cm)',
+                             'Ancho de larva (cm)', 'Peso de larva aprox (g)', 'Ubicacion de la captura'])
+        for d in captura['detecciones']:
+            if 'medidas' not in d:
+                continue
+            writer.writerow([
+                captura['numero'], captura['fecha_hora'], d['id_captura'],
+                d['medidas']['largo_cm'], d['medidas']['ancho_cm'], d['medidas']['peso_g'],
+                captura.get('ruta_relativa', '')
+            ])
 
 
 def nueva_sesion_id():

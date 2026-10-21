@@ -4,7 +4,7 @@ import shutil
 import os
 
 # Ruta base del proyecto
-BASE_DIR = '/Users/alan/Desktop/LUMACAD/ProyectoLarvas'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RUNS_DIR = os.path.join(BASE_DIR, 'runs')
 
 # Cambia a True si quieres borrar todos los entrenamientos anteriores

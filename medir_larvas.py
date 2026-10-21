@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 import json
@@ -6,7 +7,7 @@ from ultralytics import YOLO
 # ==============================
 # CONFIGURACION
 # ==============================
-MODEL_PATH = '/Users/alan/Desktop/LUMACAD/ProyectoLarvas/runs/larvas_v1/weights/best.pt'
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runs', 'larvas_v1', 'weights', 'best.pt')
 CONF_THRESHOLD = 0.15
 CALIB_PATH = "calibracion.json"
 
