@@ -2,7 +2,7 @@ import os
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from ui_paneles import PanelCalibracion, PanelDeteccion, PanelRegistro
+from ui_paneles import PanelCalibracion, PanelDeteccion, PanelRegistro, PanelTendencia
 from core_detector import DetectorLarvas
 from core_procesador import ProcesadorVideo
 from core_archivos import cargar_calibracion, exportar_excel_por_captura
@@ -43,13 +43,16 @@ class AplicacionLarvas:
             self._on_calibracion_guardada, self.notificar
         )
         self.panel_deteccion = PanelDeteccion(
-            notebook, self.detector, self.procesador, self.calibracion, self._on_captura_registrada
+            notebook, self.detector, self.procesador, self.calibracion,
+            self._on_sesion_iniciada, self._on_captura_registrada, self._on_periodo_actualizado
         )
         self.panel_registro = PanelRegistro(notebook, self._on_exportar)
+        self.panel_tendencia = PanelTendencia(notebook)
 
         notebook.add(self.panel_calibracion, text='Calibracion')
         notebook.add(self.panel_deteccion, text='Deteccion')
         notebook.add(self.panel_registro, text='Registro')
+        notebook.add(self.panel_tendencia, text='Tendencia')
 
         # Atajos: Espacio = pausar/reanudar, Esc = detener
         self.root.bind('<space>', self.panel_deteccion.atajo_pausa)
@@ -62,8 +65,16 @@ class AplicacionLarvas:
         self.calibracion = datos
         self.panel_deteccion.actualizar_calibracion(datos)
 
+    def _on_sesion_iniciada(self, sesion_id):
+        self.panel_tendencia.nueva_sesion(sesion_id)
+
     def _on_captura_registrada(self, captura):
         self.panel_registro.agregar_captura(captura)
+        self.panel_tendencia.agregar_captura(captura)
+
+    def _on_periodo_actualizado(self, resumen):
+        self.panel_registro.actualizar_periodo(resumen)
+        self.panel_tendencia.actualizar_periodo(resumen)
 
     def _on_cerrar(self):
         if self.panel_deteccion.sesion_activa():
@@ -78,9 +89,9 @@ class AplicacionLarvas:
         self.detector.cerrar_camara()
         self.root.destroy()
 
-    def _on_exportar(self, capturas, ruta):
+    def _on_exportar(self, capturas, periodos, ruta):
         try:
-            exportar_excel_por_captura(capturas, ruta)
+            exportar_excel_por_captura(capturas, ruta, periodos=periodos)
             self.notificar(f"Exportado en: {ruta}")
         except Exception as e:
             messagebox.showerror("Error", str(e))

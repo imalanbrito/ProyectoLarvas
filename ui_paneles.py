@@ -74,6 +74,10 @@ def describir_calibracion(c):
     return f"Calibracion actual: {forma} | {c['factor_escala']:.4f} cm/px | Area {c['area_cm2']:.2f} cm2"
 
 
+def fmt(valor, decimales=2):
+    return '-' if valor is None else f"{valor:.{decimales}f}"
+
+
 def abrir_archivo(ruta):
     if sys.platform == 'darwin':
         subprocess.Popen(['open', ruta])
@@ -334,12 +338,16 @@ class PanelCalibracion(ttk.Frame):
 # PANEL DE DETECCION (preview + captura periodica)
 # ==========================================================
 class PanelDeteccion(ttk.Frame):
-    def __init__(self, parent, detector, procesador, calibracion, on_captura_registrada):
+    def __init__(self, parent, detector, procesador, calibracion,
+                 on_sesion_iniciada, on_captura_registrada, on_periodo_actualizado):
         super().__init__(parent)
         self.detector = detector
         self.procesador = procesador
         self.calibracion = calibracion
+        self.on_sesion_iniciada = on_sesion_iniciada
         self.on_captura_registrada = on_captura_registrada
+        self.on_periodo_actualizado = on_periodo_actualizado
+        self._resumen_periodo = None
 
         self.sesion = None
         self.modo = 'idle'  # idle, preview, captura
@@ -370,10 +378,15 @@ class PanelDeteccion(ttk.Frame):
 
         ttk.Button(top, text="Refrescar", command=lambda: self._refrescar_camaras(forzar=True)).pack(side='left', padx=5)
 
-        ttk.Label(top, text="Intervalo (s):").pack(side='left', padx=(20, 5))
-        self.entry_intervalo = ttk.Entry(top, width=6)
-        self.entry_intervalo.insert(0, '10')
+        ttk.Label(top, text="Captura cada (s):").pack(side='left', padx=(15, 5))
+        self.entry_intervalo = ttk.Entry(top, width=5)
+        self.entry_intervalo.insert(0, '60')
         self.entry_intervalo.pack(side='left')
+
+        ttk.Label(top, text="Promediar cada (min):").pack(side='left', padx=(10, 5))
+        self.entry_periodo = ttk.Entry(top, width=5)
+        self.entry_periodo.insert(0, '60')
+        self.entry_periodo.pack(side='left')
 
         self.btn_preview = ttk.Button(top, text="Iniciar preview", command=self._iniciar_preview)
         self.btn_preview.pack(side='left', padx=10)
@@ -427,6 +440,9 @@ class PanelDeteccion(ttk.Frame):
         self.barra_progreso.pack(side='right')
         self.label_siguiente = ttk.Label(fila_progreso, text="")
         self.label_siguiente.pack(side='right', padx=10)
+
+        self.label_periodo = ttk.Label(self, text="")
+        self.label_periodo.pack(padx=10, pady=(0, 8), anchor='w')
 
     def _refrescar_camaras(self, forzar=False):
         camaras = self.detector.listar_camaras(forzar=forzar)
@@ -488,20 +504,27 @@ class PanelDeteccion(ttk.Frame):
 
         try:
             intervalo = float(self.entry_intervalo.get())
-            if intervalo <= 0:
+            periodo_min = float(self.entry_periodo.get())
+            if intervalo <= 0 or periodo_min <= 0:
                 raise ValueError
         except ValueError:
-            messagebox.showerror("Error", "El intervalo debe ser un numero positivo.")
+            messagebox.showerror("Error", "El intervalo y el periodo deben ser numeros positivos.")
+            return
+        if periodo_min * 60 < intervalo:
+            messagebox.showerror("Error", "El periodo largo debe ser mayor que el intervalo de captura.")
             return
 
-        self.sesion = SesionCaptura(intervalo_segundos=intervalo, guardar_imagenes=True)
+        self.sesion = SesionCaptura(intervalo_segundos=intervalo, periodo_segundos=periodo_min * 60,
+                                    guardar_imagenes=True)
         sesion_id = self.sesion.iniciar()
+        self._resumen_periodo = None
+        self.on_sesion_iniciada(sesion_id)
 
         self.procesador.reset_tracker()
         self.modo = 'captura'
         self.btn_muestreo.config(state='disabled')
         self.btn_pausar.config(state='normal')
-        self._texto_sesion = f"Sesion: {sesion_id} | Intervalo: {intervalo}s"
+        self._texto_sesion = f"Sesion: {sesion_id} | Captura cada {intervalo:g} s | Promedio cada {periodo_min:g} min"
         self.label_estado.config(
             text=f"{self._texto_sesion} | Muestreando... (autoguardado en capturas/{sesion_id}/)"
         )
@@ -523,7 +546,9 @@ class PanelDeteccion(ttk.Frame):
         self.modo = 'idle'
         self.procesador.detectar = False
         if self.sesion:
-            self.sesion.detener()
+            cerrado = self.sesion.detener()
+            if cerrado:
+                self._on_periodo(cerrado)
             self.sesion = None
         self._reset_botones()
         self.label_estado.config(text="Muestreo detenido. La camara sigue abierta con el zoom actual.")
@@ -541,6 +566,7 @@ class PanelDeteccion(ttk.Frame):
         self.btn_pausar.config(text="Pausar (Espacio)")
         self.btn_detener.config(state='disabled')
         self.label_siguiente.config(text="")
+        self.label_periodo.config(text="")
         self.label_rendimiento.config(text="")
         self.barra_progreso['value'] = 0
 
@@ -548,6 +574,10 @@ class PanelDeteccion(ttk.Frame):
     def _loop(self):
         if self.modo == 'idle':
             return
+
+        if self.modo == 'captura':
+            for resumen in self.sesion.avanzar_periodos():
+                self._on_periodo(resumen)
 
         res = self.procesador.ultimo_resultado()
         if res is not None and res['seq'] != self._ultimo_seq and res['detecciones'] is not None:
@@ -581,6 +611,7 @@ class PanelDeteccion(ttk.Frame):
     def _actualizar_cuenta_regresiva(self):
         if self.modo != 'captura' or self.sesion is None:
             return
+        self._actualizar_label_periodo()
         restante = self.sesion.segundos_restantes()
         if restante is None:
             self.label_siguiente.config(text="Pausado")
@@ -602,12 +633,39 @@ class PanelDeteccion(ttk.Frame):
 
         registro = self.sesion.registrar_captura(self.frame_actual, detecciones_con_id_local)
         self.on_captura_registrada(registro)
+        self._on_periodo(self.sesion.periodo_en_curso())
 
         total_larvas = sum(c['n_larvas'] for c in self.sesion.capturas)
         self.label_contador.config(
             text=f"Capturas: {self.sesion.numero_captura} | Larvas acumuladas: {total_larvas}"
         )
         print(f"Captura {registro['numero']} - {registro['n_larvas']} larvas - {registro['hora_captura']}")
+
+    def _on_periodo(self, resumen):
+        if resumen['estado'] == 'en curso':
+            self._resumen_periodo = resumen
+        else:
+            self._resumen_periodo = None
+            print(f"Periodo {resumen['numero']} {resumen['estado']}: {resumen['n_capturas']} capturas, "
+                  f"{fmt(resumen['larvas_prom'])} larvas prom.")
+        self.on_periodo_actualizado(resumen)
+        self._actualizar_label_periodo()
+
+    def _actualizar_label_periodo(self):
+        if self.sesion is None or not self.sesion.activa:
+            return
+        r = self._resumen_periodo
+        restante = self.sesion.segundos_restantes_periodo()
+        fin = f"termina en {math.ceil(restante / 60)} min" if restante is not None else ""
+        if r is None:
+            periodo = self.sesion.periodo_en_curso()
+            self.label_periodo.config(text=f"Periodo {periodo['numero']} en curso: sin capturas aun | {fin}")
+            return
+        self.label_periodo.config(
+            text=f"Periodo {r['numero']} en curso: {r['n_capturas']} capturas | "
+                 f"{fmt(r['larvas_prom'], 1)} larvas prom. (min {r['larvas_min']}, max {r['larvas_max']}) | "
+                 f"largo prom. {fmt(r['largo_prom'])} cm | {fin}"
+        )
 
     def _anotar(self, res, detecciones, encabezado, color_encabezado=(0, 255, 255), completo=True):
         frame = res['frame'].copy()
@@ -663,6 +721,8 @@ class PanelRegistro(ttk.Frame):
         super().__init__(parent)
         self.on_exportar = on_exportar
         self.capturas_globales = []
+        self.periodos = {}    # (sesion, periodo) -> resumen
+        self._filas_periodo = {}  # (sesion, periodo) -> fila de la tabla
         self._rutas = {}      # fila de la tabla -> ruta de la imagen
         self._orden = {}      # (tabla, columna) -> descendente
         self._construir_ui()
@@ -689,8 +749,16 @@ class PanelRegistro(ttk.Frame):
             ('peso_g', 'Peso aprox (g)', 110), ('ubicacion', 'Ubicacion de la captura', 250),
         ], titulo="Larvas")
 
+        self.tabla_periodos = self._crear_tabla(paneles, [
+            ('periodo', 'Periodo', 60), ('estado', 'Estado', 75), ('inicio', 'Inicio', 75), ('fin', 'Fin', 75),
+            ('n_capturas', 'Capturas', 70), ('larvas_prom', 'Larvas prom.', 90),
+            ('larvas_rango', 'Min - Max', 75), ('largo_prom', 'Largo prom. (cm)', 110),
+            ('ancho_prom', 'Ancho prom. (cm)', 110), ('peso_prom', 'Peso prom. (g)', 100),
+            ('peso_total_prom', 'Peso total prom. (g)', 130),
+        ], titulo="Resumen por periodo largo (promedio de las capturas)", alto=4)
+
         self.tabla_resumen = self._crear_tabla(paneles, [
-            ('captura', 'Captura', 70), ('hora', 'Hora', 90), ('n_larvas', 'Larvas', 70),
+            ('periodo', 'Periodo', 60), ('captura', 'Captura', 70), ('hora', 'Hora', 90), ('n_larvas', 'Larvas', 70),
             ('largo_prom', 'Largo prom. (cm)', 120), ('ancho_prom', 'Ancho prom. (cm)', 120),
             ('peso_prom', 'Peso prom. (g)', 110), ('peso_total', 'Peso total (g)', 110),
         ], titulo="Resumen por captura", alto=6)
@@ -737,7 +805,7 @@ class PanelRegistro(ttk.Frame):
         else:
             valores = ('-', '-', '-', '-')
         fila = self.tabla_resumen.insert('', 'end', values=(
-            captura['numero'], captura['hora_captura'], captura['n_larvas'], *valores
+            captura.get('periodo', ''), captura['numero'], captura['hora_captura'], captura['n_larvas'], *valores
         ))
         self._rutas[fila] = ruta_img
 
@@ -747,6 +815,21 @@ class PanelRegistro(ttk.Frame):
                 tabla.see(hijos[-1])
         total_filas = sum(c['n_larvas'] for c in self.capturas_globales)
         self.label_total.config(text=f"Capturas: {len(self.capturas_globales)} | Filas: {total_filas}")
+
+    def actualizar_periodo(self, r):
+        clave = (r['sesion_id'], r['numero'])
+        self.periodos[clave] = r
+        valores = (
+            r['numero'], r['estado'], r['inicio'], r['fin'], r['n_capturas'], fmt(r['larvas_prom'], 1),
+            '-' if r['larvas_min'] is None else f"{r['larvas_min']} - {r['larvas_max']}",
+            fmt(r['largo_prom']), fmt(r['ancho_prom']), fmt(r['peso_prom'], 4), fmt(r['peso_total_prom'], 4),
+        )
+        if clave in self._filas_periodo:
+            self.tabla_periodos.item(self._filas_periodo[clave], values=valores)
+        else:
+            fila = self.tabla_periodos.insert('', 'end', values=valores)
+            self._filas_periodo[clave] = fila
+            self.tabla_periodos.see(fila)
 
     def _ordenar(self, tabla, col):
         descendente = self._orden.get((str(tabla), col), False)
@@ -767,6 +850,8 @@ class PanelRegistro(ttk.Frame):
         fila = tabla.identify_row(event.y)
         if not fila:
             return
+        if tabla is self.tabla_periodos:
+            return
         ruta = self._rutas.get(fila)
         if not ruta or not os.path.exists(ruta):
             messagebox.showwarning("Imagen", "No se encontro la imagen de esta captura.")
@@ -783,13 +868,106 @@ class PanelRegistro(ttk.Frame):
             initialfile='registro_larvas.xlsx'
         )
         if ruta:
-            self.on_exportar(self.capturas_globales, ruta)
+            self.on_exportar(self.capturas_globales, list(self.periodos.values()), ruta)
 
     def _limpiar(self):
         if messagebox.askyesno("Limpiar", "Borrar todo el registro?"):
             self.capturas_globales = []
+            self.periodos = {}
+            self._filas_periodo = {}
             self._rutas = {}
-            for tabla in (self.tabla, self.tabla_resumen):
+            for tabla in (self.tabla, self.tabla_resumen, self.tabla_periodos):
                 for item in tabla.get_children():
                     tabla.delete(item)
             self.label_total.config(text="Capturas: 0 | Filas: 0")
+
+
+# ==========================================================
+# PANEL DE TENDENCIA (grafica de la sesion actual)
+# ==========================================================
+COLOR_CAPTURA = '#2a78d6'
+COLOR_PERIODO = '#eb6834'
+COLOR_TEXTO = '#5f5e5a'
+COLOR_GRILLA = '#e6e5e0'
+
+
+class PanelTendencia(ttk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent)
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+        self._capturas = []   # (minuto, larvas, largo promedio)
+        self._periodos = {}   # numero -> resumen
+
+        self.label_sesion = ttk.Label(self, text="Inicia un muestreo para ver la tendencia.")
+        self.label_sesion.pack(padx=10, pady=(10, 0), anchor='w')
+
+        self.figura = Figure(figsize=(8, 6), dpi=100)
+        self.ax_larvas, self.ax_largo = self.figura.subplots(2, 1, sharex=True)
+        self.canvas = FigureCanvasTkAgg(self.figura, master=self)
+        self.canvas.get_tk_widget().pack(fill='both', expand=True, padx=10, pady=10)
+        self._dibujar()
+
+    def nueva_sesion(self, sesion_id):
+        self._capturas = []
+        self._periodos = {}
+        self.label_sesion.config(text=f"Sesion: {sesion_id}")
+        self._dibujar()
+
+    def agregar_captura(self, captura):
+        medidas = [d['medidas']['largo_cm'] for d in captura['detecciones'] if 'medidas' in d]
+        largo = sum(medidas) / len(medidas) if medidas else None
+        self._capturas.append((captura['t_rel'] / 60, captura['n_larvas'], largo))
+        self._dibujar()
+
+    def actualizar_periodo(self, resumen):
+        self._periodos[resumen['numero']] = resumen
+        self._dibujar()
+
+    def _estilo(self, ax, titulo):
+        ax.set_title(titulo, loc='left', fontsize=10, color=COLOR_TEXTO)
+        ax.grid(axis='y', color=COLOR_GRILLA, linewidth=0.8)
+        ax.set_axisbelow(True)
+        for lado in ('top', 'right'):
+            ax.spines[lado].set_visible(False)
+        for lado in ('left', 'bottom'):
+            ax.spines[lado].set_color(COLOR_GRILLA)
+        ax.tick_params(colors=COLOR_TEXTO, labelsize=8)
+
+    def _serie(self, ax, valores, clave_periodo, decimales):
+        puntos = [(t, v) for t, v in valores if v is not None]
+        if puntos:
+            xs, ys = zip(*puntos)
+            ax.plot(xs, ys, color=COLOR_CAPTURA, linewidth=1.5, marker='o', markersize=4,
+                    label='Cada captura')
+        etiquetado = False
+        for r in self._periodos.values():
+            if r[clave_periodo] is None:
+                continue
+            ax.hlines(r[clave_periodo], r['t_inicio'] / 60, r['t_fin'] / 60, color=COLOR_PERIODO,
+                      linewidth=2.5, label=None if etiquetado else 'Promedio del periodo')
+            etiquetado = True
+            ax.annotate(f"{r[clave_periodo]:.{decimales}f}", (r['t_fin'] / 60, r[clave_periodo]),
+                        xytext=(4, 0), textcoords='offset points', va='center',
+                        fontsize=8, color=COLOR_TEXTO)
+
+    def _dibujar(self):
+        for ax in (self.ax_larvas, self.ax_largo):
+            ax.clear()
+        self._estilo(self.ax_larvas, "Larvas detectadas")
+        self._estilo(self.ax_largo, "Largo promedio (cm)")
+        self._serie(self.ax_larvas, [(t, n) for t, n, _ in self._capturas], 'larvas_prom', 1)
+        self._serie(self.ax_largo, [(t, l) for t, _, l in self._capturas], 'largo_prom', 2)
+        from matplotlib.ticker import MaxNLocator
+        self.ax_larvas.yaxis.set_major_locator(MaxNLocator(integer=True))
+        self.ax_larvas.set_ylim(bottom=-0.3)
+        self.ax_largo.set_xlabel("Minutos desde el inicio", fontsize=9, color=COLOR_TEXTO)
+        # Una sola leyenda arriba, fuera de los datos
+        for leyenda in self.figura.legends:
+            leyenda.remove()
+        if self._capturas:
+            self.figura.legend(*self.ax_larvas.get_legend_handles_labels(), loc='upper right',
+                               bbox_to_anchor=(0.97, 1), ncol=2, fontsize=8, frameon=False)
+        self.figura.tight_layout(rect=(0, 0, 1, 0.95))
+        self.canvas.draw_idle()
