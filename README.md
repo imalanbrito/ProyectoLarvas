@@ -210,20 +210,52 @@ como `config.json` y cambiar `"clave_web"` (usuario por defecto: `larvas`).
 
 ---
 
-## Primer uso
+## Primer uso (app de escritorio)
 
-1. **Calibracion** (pestana *Calibracion*): elegir camara y forma del contenedor, *Iniciar calibracion*,
-   hacer clic en los puntos (rectangulo: 4 esquinas en orden, base = 1-2 y altura = 2-3;
-   circulo: centro y un punto del borde), escribir las medidas reales en cm y *Guardar calibracion*.
-   Se guarda en `calibracion.json`; hay que repetirla si se mueve la camara o el contenedor.
-2. **Preview** (pestana *Deteccion*): revisar que las larvas se detecten bien. El control *Confianza*
-   ajusta que tan seguro debe estar el modelo (0.35 por defecto).
-3. **Muestreo**: poner *Captura cada (s)* y *Promediar cada (min)* y *Comenzar muestreo*.
-   Atajos: **Espacio** pausa o reanuda, **Esc** detiene.
-4. **Resultados**: pestanas *Registro* (tablas; doble clic en una fila abre la imagen) y *Tendencia*
-   (grafica). *Exportar a Excel* guarda todo en un archivo.
+Las imagenes son de una sesion de prueba.
 
-Los datos de cada sesion quedan en `capturas/<fecha_hora>/`, aunque el programa se cierre.
+### 1. Calibracion
+
+![Pestana Calibracion de la app](docs/img/app_calibracion.png)
+
+Elegir la forma del contenedor y la camara, y pulsar **Iniciar calibracion**. Hacer clic en los puntos
+sobre la imagen: rectangulo = 4 esquinas en orden (1-2 es la base y 2-3 la altura); circulo = centro y
+un punto del borde. **Deshacer punto** (o clic derecho, o Ctrl/Cmd+Z) borra el ultimo. Escribir las
+medidas reales en cm y **Guardar calibracion**.
+
+La calibracion se guarda en `calibracion.json` y se usa cada vez que se abre el programa; hay que
+repetirla si se mueve la camara o el contenedor.
+
+### 2. Deteccion y muestreo
+
+![Pestana Deteccion de la app](docs/img/app_deteccion.png)
+
+1. **Iniciar preview** y revisar que las larvas se detecten bien: cada una tiene un recuadro verde con su
+   numero y medidas (L = largo, A = ancho, P = peso), y lo que esta fuera del contenedor (recuadro
+   amarillo) se ve oscurecido y no se cuenta.
+2. Si aparecen detecciones falsas, subir **Confianza**; si faltan larvas, bajarla.
+   *Mostrar* oculta cajas, numeros o medidas en la vista (las imagenes guardadas siempre los tienen).
+3. Poner **Captura cada (s)** (periodo corto) y **Promediar cada (min)** (periodo largo) y pulsar
+   **Comenzar muestreo**. La primera captura se toma enseguida.
+4. Abajo se ve la sesion, el total de capturas, cuanto falta para la proxima captura y el promedio del
+   periodo en curso. **Pausar** (tecla Espacio), **Detener** (tecla Esc), **Cerrar camara**.
+
+### 3. Registro
+
+![Pestana Registro de la app](docs/img/app_registro.png)
+
+Tres tablas: cada **larva** medida, el **resumen por periodo largo** y el **resumen por captura**.
+Clic en un encabezado ordena la tabla; doble clic en una fila abre la imagen de esa captura.
+**Exportar a Excel** guarda todo en un archivo.
+
+### 4. Tendencia
+
+![Pestana Tendencia de la app](docs/img/app_tendencia.png)
+
+Puntos azules: cada captura. Lineas naranjas: el promedio de cada periodo, con su valor.
+
+Los datos de cada sesion quedan en `capturas/<fecha_hora>/` (imagenes, `registro.csv` y
+`periodos.csv`), aunque el programa se cierre.
 
 ## Guia visual de la pagina web
 

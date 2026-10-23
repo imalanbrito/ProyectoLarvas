@@ -126,18 +126,22 @@ class PanelCalibracion(ttk.Frame):
 
         ttk.Button(top, text="Refrescar", command=lambda: self._refrescar_camaras(forzar=True)).pack(side='left', padx=5)
 
-        self.btn_iniciar = ttk.Button(top, text="Iniciar calibracion", command=self._iniciar)
-        self.btn_iniciar.pack(side='left', padx=10)
+        # Los botones van en otra fila para que entren en ventanas angostas
+        botones = ttk.Frame(self)
+        botones.pack(fill='x', padx=10)
 
-        self.btn_deshacer = ttk.Button(top, text="Deshacer punto", command=self._deshacer, state='disabled')
+        self.btn_iniciar = ttk.Button(botones, text="Iniciar calibracion", command=self._iniciar)
+        self.btn_iniciar.pack(side='left')
+
+        self.btn_deshacer = ttk.Button(botones, text="Deshacer punto", command=self._deshacer, state='disabled')
         self.btn_deshacer.pack(side='left', padx=5)
 
-        self.btn_reiniciar = ttk.Button(top, text="Reiniciar puntos", command=self._reiniciar_puntos, state='disabled')
+        self.btn_reiniciar = ttk.Button(botones, text="Reiniciar puntos", command=self._reiniciar_puntos, state='disabled')
         self.btn_reiniciar.pack(side='left', padx=5)
 
-        self.btn_guardar = ttk.Button(top, text="Guardar calibracion",
+        self.btn_guardar = ttk.Button(botones, text="Guardar calibracion",
                                        command=self._guardar, state='disabled')
-        self.btn_guardar.pack(side='left', padx=10)
+        self.btn_guardar.pack(side='left', padx=5)
 
         self.canvas = tk.Canvas(self, bg='black')
         self.canvas.pack(fill='both', expand=True, padx=10, pady=10)
@@ -354,22 +358,26 @@ class PanelDeteccion(ttk.Frame):
         self.entry_periodo.insert(0, '60')
         self.entry_periodo.pack(side='left')
 
-        self.btn_preview = ttk.Button(top, text="Iniciar preview", command=self._iniciar_preview)
-        self.btn_preview.pack(side='left', padx=10)
+        # Los botones van en otra fila para que entren en ventanas angostas
+        botones = ttk.Frame(self)
+        botones.pack(fill='x', padx=10, pady=(8, 0))
 
-        self.btn_muestreo = ttk.Button(top, text="Comenzar muestreo",
+        self.btn_preview = ttk.Button(botones, text="Iniciar preview", command=self._iniciar_preview)
+        self.btn_preview.pack(side='left')
+
+        self.btn_muestreo = ttk.Button(botones, text="Comenzar muestreo",
                                         command=self._comenzar_muestreo, state='disabled')
         self.btn_muestreo.pack(side='left', padx=5)
 
-        self.btn_pausar = ttk.Button(top, text="Pausar (Espacio)",
+        self.btn_pausar = ttk.Button(botones, text="Pausar (Espacio)",
                                       command=self._toggle_pausa, state='disabled')
         self.btn_pausar.pack(side='left', padx=5)
 
-        self.btn_detener = ttk.Button(top, text="Detener (Esc)",
+        self.btn_detener = ttk.Button(botones, text="Detener (Esc)",
                                        command=self._detener, state='disabled')
         self.btn_detener.pack(side='left', padx=5)
 
-        self.btn_cerrar_cam = ttk.Button(top, text="Cerrar camara",
+        self.btn_cerrar_cam = ttk.Button(botones, text="Cerrar camara",
                                           command=self._cerrar_camara)
         self.btn_cerrar_cam.pack(side='left', padx=5)
 
