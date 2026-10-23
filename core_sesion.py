@@ -141,7 +141,7 @@ class SesionCaptura:
             'peso_total_prom': promedio([sum(m['peso_g'] for m in c['medidas']) for c in capturas]),
         }
 
-    def registrar_captura(self, frame, detecciones):
+    def registrar_captura(self, frame, detecciones, frame_original=None):
         self.numero_captura += 1
         ahora = datetime.now()
         hora_captura = ahora.strftime('%H-%M-%S')
@@ -153,6 +153,11 @@ class SesionCaptura:
             nombre = f"captura_{self.numero_captura:03d}_{hora_captura}.jpg"
             ruta_img = os.path.join(self.carpeta, nombre)
             cv2.imwrite(ruta_img, frame)
+            if frame_original is not None:
+                # Copia sin anotaciones: sirve para etiquetar y reentrenar el modelo
+                carpeta_originales = os.path.join(self.carpeta, 'originales')
+                os.makedirs(carpeta_originales, exist_ok=True)
+                cv2.imwrite(os.path.join(carpeta_originales, nombre), frame_original)
             ruta_relativa = os.path.join('capturas', self.sesion_id, nombre)
 
         medidas = [d['medidas'] for d in detecciones if 'medidas' in d]

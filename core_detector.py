@@ -7,7 +7,10 @@ from ultralytics import YOLO
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = f'{BASE_DIR}/runs/larvas_v1/weights/best.pt'
+MODEL_PATH = f'{BASE_DIR}/runs/larvas_v2/weights/best.pt'
+# Confianza minima. El modelo v2 da confianzas mas altas que v1: con 0.35 encuentra
+# las mismas larvas que v1 con 0.15, pero con menos detecciones falsas.
+CONF_POR_DEFECTO = 0.35
 
 
 def crear_mascara_roi(shape, forma, puntos):
@@ -30,13 +33,16 @@ def punto_dentro_roi(roi_mask, x, y):
 
 
 class DetectorLarvas:
-    def __init__(self, model_path=MODEL_PATH, conf=0.15):
+    def __init__(self, model_path=MODEL_PATH, conf=CONF_POR_DEFECTO):
         self.model = YOLO(model_path)
         self.conf = conf
         self.cap = None
         self._indice_actual = None
-        # Usar el tracker personalizado que esta en la raiz del proyecto
-        self.tracker_config = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bytetrack_custom.yaml')
+        # Solape permitido entre cajas antes de considerarlas la misma larva (NMS).
+        # Probado en escenas llenas: 0.5 encuentra mas larvas reales y menos falsas que 0.6/0.7
+        self.iou = 0.5
+        # Resolucion de entrada al modelo: mas alta ayuda con larvas pequenas
+        self.imgsz = 1024
         # GPU de Apple (MPS) si esta disponible, si no CPU
         self.device = 'mps' if torch.backends.mps.is_available() else 'cpu'
         print(f"Modelo usando dispositivo: {self.device}")
@@ -106,28 +112,34 @@ class DetectorLarvas:
             return None
         return frame
 
-    def _track(self, frame):
-        return self.model.track(
+    def _predecir(self, frame):
+        return self.model.predict(
             frame,
             conf=self.conf,
-            persist=True,
-            tracker=self.tracker_config,
-            iou=0.5,
+            iou=self.iou,
+            imgsz=self.imgsz,
             agnostic_nms=True,
+            # El limite por defecto (300) se queda corto en escenas muy llenas
+            max_det=500,
+            # Mascaras al tamano real del frame (sin esto quedan desplazadas por el padding)
+            retina_masks=True,
             device=self.device,
             verbose=False
         )
 
-    def detectar_con_tracking(self, frame, roi_mask=None):
+    def detectar(self, frame, roi_mask=None):
+        """
+        Detecta todas las larvas del frame. Sin tracker: el tracker descartaba
+        las detecciones con confianza menor a 0.6 (la mayoria en escenas llenas).
+        """
         try:
-            results = self._track(frame)
+            results = self._predecir(frame)
         except Exception as e:
             if self.device == 'cpu':
                 raise
             print(f"Fallo en {self.device} ({e}), cambiando a CPU")
             self.device = 'cpu'
-            self.reset_tracker()
-            results = self._track(frame)
+            results = self._predecir(frame)
 
         detecciones = []
 
@@ -135,7 +147,6 @@ class DetectorLarvas:
             if r.boxes is None:
                 continue
 
-            ids = r.boxes.id
             boxes = r.boxes.xyxy.cpu().numpy().astype(int)
             confs = r.boxes.conf.cpu().numpy()
 
@@ -144,10 +155,6 @@ class DetectorLarvas:
                 masks_np = r.masks.data.cpu().numpy()
 
             for i, (box, conf) in enumerate(zip(boxes, confs)):
-                if ids is None or ids[i] is None:
-                    continue
-                id_larva = int(ids[i].item())
-
                 x1, y1, x2, y2 = box
                 cx = int((x1 + x2) / 2)
                 cy = int((y1 + y2) / 2)
@@ -157,9 +164,7 @@ class DetectorLarvas:
 
                 mask_bin = None
                 if masks_np is not None and i < len(masks_np):
-                    m = masks_np[i]
-                    m = cv2.resize(m, (frame.shape[1], frame.shape[0]))
-                    mask_bin = (m > 0.5).astype(np.uint8) * 255
+                    mask_bin = (masks_np[i] > 0.5).astype(np.uint8) * 255
 
                     if roi_mask is not None:
                         contornos, _ = cv2.findContours(mask_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -173,7 +178,6 @@ class DetectorLarvas:
                                     continue
 
                 detecciones.append({
-                    'id': id_larva,
                     'box': (x1, y1, x2, y2),
                     'conf': float(conf),
                     'mask': mask_bin,
@@ -182,6 +186,10 @@ class DetectorLarvas:
 
         # Filtrar duplicados por solapamiento de mascaras
         detecciones = self._eliminar_duplicados_por_iou(detecciones, umbral_iou=0.7)
+        # Numerar de izquierda a derecha y de arriba a abajo para que sea facil ubicarlas
+        detecciones.sort(key=lambda d: (d['centro'][1] // 50, d['centro'][0]))
+        for i, d in enumerate(detecciones, start=1):
+            d['id'] = i
         return detecciones
 
     def _eliminar_duplicados_por_iou(self, detecciones, umbral_iou=0.7):
@@ -229,6 +237,3 @@ class DetectorLarvas:
                 conservadas.append(d)
 
         return conservadas
-
-    def reset_tracker(self):
-        self.model.predictor = None

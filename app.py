@@ -9,7 +9,7 @@ from core_archivos import cargar_calibracion, exportar_excel_por_captura
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, 'runs', 'larvas_v1', 'weights', 'best.pt')
+MODEL_PATH = os.path.join(BASE_DIR, 'runs', 'larvas_v2', 'weights', 'best.pt')
 
 
 class AplicacionLarvas:

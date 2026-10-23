@@ -22,7 +22,7 @@ def main():
         if frame is None:
             break
 
-        detecciones = detector.detectar_con_tracking(frame)
+        detecciones = detector.detectar(frame)
 
         for d in detecciones:
             x1, y1, x2, y2 = d['box']

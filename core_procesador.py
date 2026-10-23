@@ -17,7 +17,6 @@ class ProcesadorVideo:
         self.detectar = False
         self._calibracion = None
         self._roi_mask = None
-        self._reset_pendiente = False
         self._lock = threading.Lock()
         self._resultado = None
         self._seq = 0
@@ -39,10 +38,6 @@ class ProcesadorVideo:
             self._calibracion = calibracion
             self._roi_mask = None
 
-    def reset_tracker(self):
-        # Se aplica dentro del hilo, antes de la siguiente inferencia
-        self._reset_pendiente = True
-
     def ultimo_resultado(self):
         with self._lock:
             return self._resultado
@@ -63,12 +58,9 @@ class ProcesadorVideo:
                 roi_mask = self._roi_mask
 
             if self.detectar:
-                if self._reset_pendiente:
-                    self._reset_pendiente = False
-                    self.detector.reset_tracker()
                 try:
                     t0 = time.perf_counter()
-                    detecciones = self.detector.detectar_con_tracking(frame, roi_mask=roi_mask)
+                    detecciones = self.detector.detectar(frame, roi_mask=roi_mask)
                     ms_deteccion = (time.perf_counter() - t0) * 1000
                 except Exception as e:
                     print(f"Error en deteccion: {e}")

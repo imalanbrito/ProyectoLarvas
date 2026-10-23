@@ -28,6 +28,7 @@ runs/
 # Datasets (no subir a GitHub, compartir por Drive o Roboflow)
 Larvas/
 larva/
+larva_1clase/
 
 # Datos privados
 datos_larvas.xlsx
@@ -39,3 +40,7 @@ modelo_peso.json
 *.tar.gz
 
 capturas/
+
+# Imagenes exportadas para etiquetar en Roboflow
+para_etiquetar/
+entrenamiento_v2.log

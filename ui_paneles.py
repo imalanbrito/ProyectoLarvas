@@ -490,7 +490,6 @@ class PanelDeteccion(ttk.Frame):
             messagebox.showerror("Error", "No se pudo abrir la camara.")
             return
 
-        self.procesador.reset_tracker()
         self.procesador.detectar = True
         self.modo = 'preview'
         self.btn_preview.config(state='disabled')
@@ -520,7 +519,6 @@ class PanelDeteccion(ttk.Frame):
         self._resumen_periodo = None
         self.on_sesion_iniciada(sesion_id)
 
-        self.procesador.reset_tracker()
         self.modo = 'captura'
         self.btn_muestreo.config(state='disabled')
         self.btn_pausar.config(state='normal')
@@ -631,7 +629,8 @@ class PanelDeteccion(ttk.Frame):
                                          color_encabezado=(255, 255, 255))
         self.visor.mostrar(self.frame_actual)
 
-        registro = self.sesion.registrar_captura(self.frame_actual, detecciones_con_id_local)
+        registro = self.sesion.registrar_captura(self.frame_actual, detecciones_con_id_local,
+                                                 frame_original=res['frame'])
         self.on_captura_registrada(registro)
         self._on_periodo(self.sesion.periodo_en_curso())
 
