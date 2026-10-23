@@ -16,6 +16,11 @@ Funciona en **macOS, Windows, Linux y Raspberry Pi 5**, de dos formas:
 | **App de escritorio** (`app.py`) | Ventana con pestanas: Calibracion, Deteccion, Registro y Tendencia | Computadora con pantalla, uso directo |
 | **Servidor web** (`servidor_web.py`) | Pagina web con las mismas funciones, se abre desde el navegador | Raspberry Pi o cualquier equipo sin pantalla; revisar el avance desde otro lugar |
 
+![Pagina web durante un muestreo](docs/img/web_principal.png)
+*Pagina web durante un muestreo: vista en vivo con las larvas detectadas dentro del contenedor (recuadro
+amarillo), controles, datos de la sesion y resumen por periodo. Mas imagenes en la
+[guia visual](#guia-visual-de-la-pagina-web).*
+
 ## Que hace
 
 - **Calibracion**: se marcan las esquinas (rectangulo) o el centro y el borde (circulo) del contenedor
@@ -219,6 +224,62 @@ como `config.json` y cambiar `"clave_web"` (usuario por defecto: `larvas`).
    (grafica). *Exportar a Excel* guarda todo en un archivo.
 
 Los datos de cada sesion quedan en `capturas/<fecha_hora>/`, aunque el programa se cierre.
+
+## Guia visual de la pagina web
+
+La pagina web (`servidor_web.py`) tiene las mismas funciones que la app de escritorio. Las imagenes
+son de una sesion de prueba.
+
+### Vista principal
+
+Arriba a la izquierda, la camara en vivo: las larvas detectadas tienen un recuadro verde con su numero
+y sus medidas (L = largo, A = ancho, P = peso), y lo que esta fuera del contenedor calibrado se ve
+oscurecido. Debajo: larvas en la imagen actual, capturas tomadas, larvas acumuladas y tiempo de
+deteccion. A la derecha, el **Control**:
+
+1. **Camara**: elegir la camara (*Buscar* si no aparece). `usb:N` son webcams; `picam:N`, el Pi Camera Module.
+2. **Captura cada (s)** y **Promediar cada (min)**: el periodo corto y el largo.
+3. **Preview** para ver las detecciones; **Comenzar muestreo** para empezar a guardar.
+   **Pausar**, **Detener** (pide un segundo clic para confirmar) y **Cerrar camara**.
+4. **Confianza**: subirla si aparecen detecciones falsas, bajarla si faltan larvas.
+
+La seccion **Sesion** muestra cuanto falta para la proxima captura (barra azul) y para que termine el periodo.
+
+### Calibracion
+
+![Pestana Calibracion](docs/img/web_calibracion.png)
+
+Con la camara abierta (*Preview*): **Tomar imagen**, hacer clic en las esquinas del contenedor en orden
+(1 y 2 = base, 2 y 3 = altura) o, si es circular, en el centro y en un punto del borde. Escribir las
+medidas reales y **Guardar calibracion**. *Deshacer punto* borra el ultimo clic.
+
+### Periodos y capturas
+
+La pestana **Periodos** (en la vista principal) tiene una fila por periodo largo con el promedio de sus
+capturas; el periodo actual aparece como *en curso* y se actualiza con cada captura. La pestana
+**Capturas** tiene una fila por captura, con un enlace para ver la imagen guardada:
+
+![Pestana Capturas](docs/img/web_capturas.png)
+
+### Tendencia
+
+![Pestana Tendencia](docs/img/web_tendencia.png)
+
+Puntos azules: cada captura. Lineas naranjas: el promedio de cada periodo (con su valor). Arriba, larvas
+detectadas; abajo, largo promedio.
+
+### Descargas
+
+![Pestana Descargas](docs/img/web_descargas.png)
+
+Cada sesion se puede descargar en Excel (resumen por periodo, por captura y por larva), en CSV o con
+todas sus imagenes en un ZIP.
+
+### Desde el celular
+
+<img src="docs/img/web_movil.png" alt="Pagina web en un celular" width="300">
+
+La misma pagina se adapta a la pantalla del celular.
 
 ## Configuracion (opcional)
 
