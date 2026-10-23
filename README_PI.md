@@ -10,7 +10,7 @@ igual en la Mac.
 - Tarjeta microSD de 32 GB o mas (o un SSD).
 - Una camara: **webcam USB** o **Pi Camera Module** (cable plano). Se puede usar cualquiera.
 - En la Mac: este proyecto con el modelo en `runs/larvas_v2/weights/` (`best.pt` y `best_ncnn_model/`).
-  Si falta `best_ncnn_model`, crearlo con `python exportar_modelo_pi.py`.
+  Si falta `best_ncnn_model`, crearlo con `python herramientas/exportar_modelo_pi.py`.
 
 ## 2. Preparar la Pi (una sola vez)
 
@@ -96,7 +96,7 @@ pero para la pagina web se necesita Tailscale.
 ```bash
 ssh usuario@larvas
 cd ProyectoLarvas
-venv_pi/bin/python ver_estado.py        # resumen: sesion, capturas, periodos
+venv_pi/bin/python herramientas/ver_estado.py        # resumen: sesion, capturas, periodos
 journalctl -u larvas -f                 # lo que va haciendo el programa (Ctrl+C para salir)
 sudo systemctl restart larvas           # reiniciar el programa
 sudo systemctl stop larvas              # detenerlo (start para iniciarlo)
@@ -123,7 +123,7 @@ Despues de cambiarlo: `sudo systemctl restart larvas`.
 
 - En la Pi el modelo corre en el procesador (formato NCNN). Se estima **0.5 a 1 s por imagen**;
   el valor real aparece en la pagina ("Deteccion"). Con capturas cada 60 s sobra tiempo.
-- Si es demasiado lento: `python exportar_modelo_pi.py --imgsz 640` y poner `"imgsz": 640`
+- Si es demasiado lento: `python herramientas/exportar_modelo_pi.py --imgsz 640` y poner `"imgsz": 640`
   (unas 2.5 veces mas rapido, algo peor con larvas muy pequenas).
 - Con el disipador activo la Pi no deberia pasar de ~70 °C. Por encima de 80 °C se frena sola.
 - Cada captura guarda 2 imagenes (con y sin anotaciones), unos 250 KB. Con una captura por minuto

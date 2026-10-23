@@ -4,10 +4,10 @@ import cv2
 import os
 from collections import deque
 
-from core_archivos import agregar_captura_csv, agregar_periodo_csv
+from nucleo.configuracion import BASE_DIR
+from nucleo.core_archivos import agregar_captura_csv, agregar_periodo_csv
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CAPTURAS_DIR = os.path.join(BASE_DIR, 'capturas')
 
 

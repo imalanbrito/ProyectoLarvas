@@ -7,12 +7,10 @@ import os
 import subprocess
 import sys
 
-from core_archivos import guardar_calibracion
-from core_dibujo import anotar_frame, dibujar_puntos_calibracion
-from core_medidor import calcular_calibracion
-import core_grafica
-
-
+from nucleo.core_archivos import guardar_calibracion
+from nucleo.core_dibujo import anotar_frame, dibujar_puntos_calibracion
+from nucleo.core_medidor import calcular_calibracion
+from nucleo import core_grafica
 # ==========================================================
 # UTILIDADES
 # ==========================================================
@@ -473,7 +471,7 @@ class PanelDeteccion(ttk.Frame):
         self._loop()
 
     def _comenzar_muestreo(self):
-        from core_sesion import SesionCaptura
+        from nucleo.core_sesion import SesionCaptura
 
         try:
             intervalo = float(self.entry_intervalo.get())

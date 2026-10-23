@@ -6,7 +6,8 @@ import importlib.util
 import json
 import os
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Raiz del proyecto (nucleo/ esta un nivel abajo)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUTA_CONFIG = os.path.join(BASE_DIR, 'config.json')
 CARPETA_PESOS = os.path.join(BASE_DIR, 'runs', 'larvas_v2', 'weights')
 

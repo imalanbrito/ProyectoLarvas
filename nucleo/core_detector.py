@@ -5,8 +5,8 @@ import numpy as np
 import torch
 from ultralytics import YOLO
 
-import core_camara
-from configuracion import CONFIG, ruta_modelo
+from nucleo import core_camara
+from nucleo.configuracion import CONFIG, ruta_modelo
 
 
 MODEL_PATH = ruta_modelo(CONFIG)

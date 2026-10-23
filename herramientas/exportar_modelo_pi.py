@@ -3,17 +3,21 @@ Exporta el modelo a NCNN, el formato mas rapido para el procesador de la Raspber
 Se puede correr en la Mac o en la Pi; el resultado es la carpeta
 runs/larvas_v2/weights/best_ncnn_model, que el programa usa automaticamente en la Pi.
 
-    python exportar_modelo_pi.py            # 1024 px (misma calidad que en la Mac)
-    python exportar_modelo_pi.py --imgsz 640 # ~2.5 veces mas rapido, algo peor con larvas pequenas
+    python herramientas/exportar_modelo_pi.py            # 1024 px (misma calidad que en la Mac)
+    python herramientas/exportar_modelo_pi.py --imgsz 640 # ~2.5 veces mas rapido, algo peor con larvas pequenas
 
 Si se exporta con otro tamano, poner el mismo "imgsz" en config.json de la Pi.
 """
 import argparse
 import os
+import sys
 
 from ultralytics import YOLO
 
-from configuracion import CARPETA_PESOS
+# Permite importar nucleo/ al correr el script directamente (python herramientas/...)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from nucleo.configuracion import CARPETA_PESOS
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

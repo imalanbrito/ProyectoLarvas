@@ -13,8 +13,10 @@ CARPETA_PI="${2:-ProyectoLarvas}"
 cd "$(dirname "$0")/.."
 
 echo "==> Codigo"
+# rsync usa la primera regla que coincide: las exclusiones generales van primero
 rsync -av --delete \
-    --include 'deploy/***' --include 'web/***' \
+    --exclude '__pycache__/' \
+    --include 'nucleo/***' --include 'herramientas/***' --include 'deploy/***' --include 'web/***' \
     --include '*.py' --include 'requirements-pi.txt' --include 'config.ejemplo.json' \
     --include 'README_PI.md' \
     --exclude 'venv_pi/***' --exclude 'runs/***' --exclude 'capturas/***' \
@@ -23,7 +25,7 @@ rsync -av --delete \
     ./ "$DESTINO:$CARPETA_PI/"
 
 echo "==> Modelo"
-rsync -av --relative \
+rsync -av --relative --exclude '__pycache__/' \
     runs/larvas_v2/weights/best.pt \
     runs/larvas_v2/weights/best_ncnn_model \
     "$DESTINO:$CARPETA_PI/"

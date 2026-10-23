@@ -41,7 +41,7 @@ try:
     print("    picamera2 OK (Pi Camera Module disponible)")
 except Exception as e:
     print(f"    picamera2 no disponible ({e}); solo se podran usar camaras USB")
-import core_camara
+from nucleo import core_camara
 print(f"    Camaras encontradas: {core_camara.listar_camaras() or 'ninguna'}")
 PY
 
@@ -50,7 +50,7 @@ if [ -d runs/larvas_v2/weights/best_ncnn_model ]; then
     echo "    Modelo NCNN encontrado (rapido en la Pi)"
 elif [ -f runs/larvas_v2/weights/best.pt ]; then
     echo "    Solo esta best.pt; exportando a NCNN (tarda unos minutos)..."
-    venv_pi/bin/python exportar_modelo_pi.py
+    venv_pi/bin/python herramientas/exportar_modelo_pi.py
 else
     echo "    FALTA EL MODELO: copia runs/larvas_v2/weights/ desde la Mac (ver README_PI.md)"
     exit 1
@@ -74,7 +74,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable larvas
 sudo systemctl restart larvas
 
-PUERTO="$(venv_pi/bin/python -c 'from configuracion import CONFIG; print(CONFIG["puerto"])')"
+PUERTO="$(venv_pi/bin/python -c 'from nucleo.configuracion import CONFIG; print(CONFIG["puerto"])')"
 echo
 echo "Listo. Abre en el navegador:"
 echo "    http://$(hostname).local:$PUERTO"

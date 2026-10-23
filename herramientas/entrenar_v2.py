@@ -4,13 +4,14 @@ Entrenamiento v2: una sola clase 'larva', modelo mas grande y mayor resolucion.
 - No borra entrenamientos anteriores: el modelo actual (runs/larvas_v1) sigue intacto.
 - Sigue siendo un modelo de segmentacion, asi que el best.pt resultante funciona
   en la app sin cambios (solo hay que apuntar MODEL_PATH a runs/larvas_v2).
-- Antes de correrlo: python preparar_dataset_1clase.py
+- Antes de correrlo: python herramientas/preparar_dataset_1clase.py
 """
 from ultralytics import YOLO
 import torch
 import os
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Raiz del proyecto (este script esta en herramientas/)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_YAML = os.path.join(BASE_DIR, 'larva_1clase', 'data.yaml')
 
 # Tiempos medidos en esta Mac (MPS, 32 GB):
@@ -22,7 +23,7 @@ RAPIDO = False
 
 if __name__ == '__main__':
     if not os.path.exists(DATA_YAML):
-        raise SystemExit("Falta el dataset. Corre primero: python preparar_dataset_1clase.py")
+        raise SystemExit("Falta el dataset. Corre primero: python herramientas/preparar_dataset_1clase.py")
 
     device = 'mps' if torch.backends.mps.is_available() else 'cpu'
     print(f"Usando dispositivo: {device}")

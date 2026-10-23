@@ -1,13 +1,18 @@
 """
 Resumen del muestreo en la terminal (para revisar por SSH sin abrir la pagina web).
 
-    venv_pi/bin/python ver_estado.py
+    venv_pi/bin/python herramientas/ver_estado.py
 """
 import base64
 import json
+import os
+import sys
 import urllib.request
 
-from configuracion import CONFIG
+# Permite importar nucleo/ al correr el script directamente (python herramientas/...)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from nucleo.configuracion import CONFIG
 
 
 def pedir(ruta):

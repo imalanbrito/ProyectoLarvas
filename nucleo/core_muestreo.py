@@ -12,14 +12,14 @@ from collections import deque
 
 import cv2
 
-from core_archivos import cargar_calibracion, guardar_calibracion
-from core_detector import DetectorLarvas
-from core_dibujo import anotar_frame
-from core_grafica import punto_de_captura
-from core_medidor import calcular_calibracion
-from core_procesador import ProcesadorVideo
-from core_sesion import SesionCaptura
-from configuracion import BASE_DIR, CONFIG
+from nucleo.core_archivos import cargar_calibracion, guardar_calibracion
+from nucleo.core_detector import DetectorLarvas
+from nucleo.core_dibujo import anotar_frame
+from nucleo.core_grafica import punto_de_captura
+from nucleo.core_medidor import calcular_calibracion
+from nucleo.core_procesador import ProcesadorVideo
+from nucleo.core_sesion import SesionCaptura
+from nucleo.configuracion import BASE_DIR, CONFIG
 
 RUTA_ESTADO = os.path.join(BASE_DIR, 'estado_muestreo.json')
 # Si la camara no entrega imagen durante este tiempo, se intenta reabrir

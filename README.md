@@ -331,30 +331,56 @@ Sin configuracion el programa funciona con valores por defecto. Para cambiarlos,
 
 ## Estructura del proyecto
 
-| Archivo / carpeta | Contenido |
+```
+ProyectoLarvas/
+├── app.py               # App de escritorio:  python app.py
+├── servidor_web.py      # Servidor web:       python servidor_web.py
+├── nucleo/              # Codigo del programa (lo usan los dos de arriba)
+├── herramientas/        # Scripts que se usan de vez en cuando (entrenar, exportar, ver estado)
+├── web/                 # Pagina web del servidor
+├── deploy/              # Instalacion en Raspberry Pi
+├── docs/img/            # Imagenes de este README
+├── requirements.txt     # Paquetes para Mac / Windows / Linux
+├── requirements-pi.txt  # Paquetes para Raspberry Pi
+├── config.ejemplo.json  # Ejemplo de configuracion (copiar como config.json)
+├── README.md, README_PI.md
+│
+│  Se crean al usar el programa (no estan en el repositorio):
+├── runs/                # Modelos entrenados (ver "Paso 2")
+├── capturas/            # Resultados de cada sesion
+├── calibracion.json     # Calibracion guardada
+└── config.json          # Configuracion local (contiene la contrasena web)
+```
+
+**`nucleo/`**
+
+| Archivo | Contenido |
 |---|---|
-| `app.py`, `ui_paneles.py` | App de escritorio (Tkinter) |
-| `servidor_web.py`, `web/index.html` | Servidor y pagina web |
+| `ui_paneles.py` | Pestanas de la app de escritorio (Tkinter) |
+| `core_muestreo.py` | Control del muestreo sin ventana (lo usa el servidor web) |
 | `core_detector.py` | Carga del modelo y deteccion |
 | `core_camara.py` | Camaras USB, integradas y Pi Camera en cada sistema |
 | `core_procesador.py` | Hilo que lee la camara y detecta sin congelar la interfaz |
-| `core_sesion.py`, `core_muestreo.py` | Muestreo: capturas, periodos y guardado |
-| `core_medidor.py`, `core_dibujo.py`, `core_grafica.py`, `core_archivos.py` | Medidas, dibujo, graficas y archivos |
-| `configuracion.py`, `config.ejemplo.json` | Configuracion |
-| `ver_estado.py` | Resumen del servidor web en la terminal (util por SSH) |
-| `deploy/`, `requirements-pi.txt`, `README_PI.md` | Instalacion en Raspberry Pi |
-| `capturas/` | Resultados de cada sesion (se crea solo) |
+| `core_sesion.py` | Una sesion de muestreo: capturas, periodos y guardado |
+| `core_medidor.py` | Medidas de cada larva y calculo de la calibracion |
+| `core_dibujo.py`, `core_grafica.py` | Anotaciones sobre la imagen y grafica de tendencia |
+| `core_archivos.py` | Calibracion, CSV y Excel |
+| `configuracion.py` | Valores por defecto y lectura de `config.json` |
 
-## Mejorar el modelo
+## Herramientas
+
+Se corren desde la carpeta del proyecto, por ejemplo `python herramientas/ver_estado.py`.
 
 | Script | Para que |
 |---|---|
+| `ver_estado.py` | Resumen del servidor web en la terminal (util por SSH) |
+| `probar_detector.py` | Prueba rapida: abre una camara y muestra las detecciones en una ventana |
 | `exportar_para_etiquetar.py` | Junta capturas con muchas larvas (de `capturas/*/originales/`), las pre-etiqueta y crea un ZIP para corregir en Roboflow |
 | `preparar_dataset_1clase.py` | Une las clases del dataset en una sola clase "larva" |
 | `entrenar_v2.py` | Entrena el modelo (~1 dia en una Mac con chip M; guarda en `runs/larvas_v2`) |
 | `exportar_modelo_pi.py` | Crea la version NCNN del modelo (Raspberry Pi y computadoras sin GPU) |
 
-Los datasets (`larva/`, `Larvas/`) y los modelos no estan en el repositorio; se comparten aparte.
+Los datasets (`larva/`, `Larvas/`, `fotos/`) y los modelos no estan en el repositorio; se comparten aparte.
 
 ## Problemas comunes
 
@@ -363,6 +389,6 @@ Los datasets (`larva/`, `Larvas/`) y los modelos no estan en el repositorio; se 
 | `No module named tkinter` | macOS: `brew install python-tk@3.11`. Linux: `sudo apt install python3-tk`. Windows: reinstalar Python con "tcl/tk" marcado |
 | No se encuentra `best.pt` | Falta el modelo: ver *Paso 2* |
 | No aparece ninguna camara | Revisar permisos de camara (ver la seccion de cada sistema) y pulsar *Refrescar* |
-| Va lento | Sin GPU es normal. Instalar `pip install ncnn`, crear el modelo NCNN (`python exportar_modelo_pi.py`) y poner `"segundos_entre_detecciones": 1` en `config.json` |
+| Va lento | Sin GPU es normal. Instalar `pip install ncnn`, crear el modelo NCNN (`python herramientas/exportar_modelo_pi.py`) y poner `"segundos_entre_detecciones": 1` en `config.json` |
 | Medidas incorrectas | Repetir la calibracion; comprobar que los puntos esten en el orden indicado |
 | Con NVIDIA no usa la GPU | PyTorch se instalo sin CUDA: reinstalarlo desde pytorch.org dentro del entorno |

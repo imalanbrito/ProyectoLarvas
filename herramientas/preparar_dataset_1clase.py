@@ -6,7 +6,8 @@ Las imagenes se enlazan (hard link), asi que no ocupan espacio extra.
 import os
 import shutil
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Raiz del proyecto (este script esta en herramientas/)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ORIGEN = os.path.join(BASE_DIR, 'larva')
 DESTINO = os.path.join(BASE_DIR, 'larva_1clase')
 

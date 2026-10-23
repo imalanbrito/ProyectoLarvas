@@ -7,21 +7,24 @@ un .zip listo para subir a Roboflow. En Roboflow solo hay que corregir: borrar
 detecciones falsas y agregar las larvas que falten.
 
 Uso:
-    python exportar_para_etiquetar.py                  # todas las sesiones
-    python exportar_para_etiquetar.py otra/carpeta     # otra carpeta con imagenes
-    python exportar_para_etiquetar.py --min-larvas 5 --max-imagenes 150
+    python herramientas/exportar_para_etiquetar.py                  # todas las sesiones
+    python herramientas/exportar_para_etiquetar.py otra/carpeta     # otra carpeta con imagenes
+    python herramientas/exportar_para_etiquetar.py --min-larvas 5 --max-imagenes 150
 """
 import argparse
 import glob
 import os
 import shutil
+import sys
 from datetime import datetime
 
 import cv2
 
-from core_detector import DetectorLarvas, MODEL_PATH, CONF_POR_DEFECTO
+# Permite importar nucleo/ al correr el script directamente (python herramientas/...)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+from nucleo.configuracion import BASE_DIR
+from nucleo.core_detector import DetectorLarvas, MODEL_PATH, CONF_POR_DEFECTO
 
 
 def mascara_a_poligono(mask, ancho, alto):

@@ -1,9 +1,9 @@
 import threading
 import time
 
-from core_detector import crear_mascara_roi
-from core_medidor import calcular_medidas_desde_mascara
-from configuracion import CONFIG
+from nucleo.core_detector import crear_mascara_roi
+from nucleo.core_medidor import calcular_medidas_desde_mascara
+from nucleo.configuracion import CONFIG
 
 
 class ProcesadorVideo:

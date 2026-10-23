@@ -4,8 +4,9 @@ import os
 from datetime import datetime
 import pandas as pd
 
+from nucleo.configuracion import BASE_DIR
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 CALIB_PATH = os.path.join(BASE_DIR, 'calibracion.json')
 
 # Columnas del resumen por periodo largo: (clave, encabezado)

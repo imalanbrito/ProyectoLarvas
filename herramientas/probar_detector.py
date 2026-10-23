@@ -1,5 +1,12 @@
+import os
+import sys
+
 import cv2
-from core_detector import DetectorLarvas
+
+# Permite importar nucleo/ al correr el script directamente (python herramientas/...)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from nucleo.core_detector import DetectorLarvas
 
 
 def main():
