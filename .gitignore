@@ -44,3 +44,8 @@ capturas/
 # Imagenes exportadas para etiquetar en Roboflow
 para_etiquetar/
 entrenamiento_v2.log
+
+# Raspberry Pi: configuracion local (contiene la contrasena), estado y entorno
+config.json
+estado_muestreo.json
+venv_pi/

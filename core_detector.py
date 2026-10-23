@@ -5,12 +5,14 @@ import numpy as np
 import torch
 from ultralytics import YOLO
 
+import core_camara
+from configuracion import CONFIG, ruta_modelo
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = f'{BASE_DIR}/runs/larvas_v2/weights/best.pt'
+
+MODEL_PATH = ruta_modelo(CONFIG)
 # Confianza minima. El modelo v2 da confianzas mas altas que v1: con 0.35 encuentra
 # las mismas larvas que v1 con 0.15, pero con menos detecciones falsas.
-CONF_POR_DEFECTO = 0.35
+CONF_POR_DEFECTO = CONFIG['conf']
 
 
 def crear_mascara_roi(shape, forma, puntos):
@@ -34,83 +36,80 @@ def punto_dentro_roi(roi_mask, x, y):
 
 class DetectorLarvas:
     def __init__(self, model_path=MODEL_PATH, conf=CONF_POR_DEFECTO):
-        self.model = YOLO(model_path)
+        self.model = YOLO(model_path, task='segment')
         self.conf = conf
-        self.cap = None
-        self._indice_actual = None
+        self.camara = None
+        self._id_camara = None
         # Solape permitido entre cajas antes de considerarlas la misma larva (NMS).
         # Probado en escenas llenas: 0.5 encuentra mas larvas reales y menos falsas que 0.6/0.7
         self.iou = 0.5
         # Resolucion de entrada al modelo: mas alta ayuda con larvas pequenas
-        self.imgsz = 1024
-        # GPU de Apple (MPS) si esta disponible, si no CPU
-        self.device = 'mps' if torch.backends.mps.is_available() else 'cpu'
-        print(f"Modelo usando dispositivo: {self.device}")
-        # Protege self.cap: la camara se lee desde el hilo de procesamiento
+        self.imgsz = CONFIG['imgsz']
+        # GPU si hay (Apple = MPS, NVIDIA = CUDA), si no CPU. Los modelos NCNN siempre van en CPU
+        es_ncnn = str(model_path).rstrip('/\\').endswith('_ncnn_model')
+        if es_ncnn:
+            self.device = 'cpu'
+        elif torch.cuda.is_available():
+            self.device = 'cuda:0'
+        elif torch.backends.mps.is_available():
+            self.device = 'mps'
+        else:
+            self.device = 'cpu'
+        self.nombre_modelo = os.path.basename(str(model_path).rstrip('/\\'))
+        print(f"Modelo {model_path} usando dispositivo: {self.device}")
+        # Protege la camara: se lee desde el hilo de procesamiento
         self._lock_camara = threading.Lock()
         self._camaras_cache = None
-        self.ancho_deseado = 1280
-        self.alto_deseado = 720
+        self.ancho_deseado = CONFIG['ancho']
+        self.alto_deseado = CONFIG['alto']
 
-    def listar_camaras(self, max_test=5, forzar=False):
+    def listar_camaras(self, forzar=False):
         # Probar camaras es lento; se reutiliza la lista salvo que se pida refrescar
-        if self._camaras_cache is not None and not forzar:
-            return self._camaras_cache
-        disponibles = []
-        for i in range(max_test):
-            if i == self._indice_actual:
-                # Ya esta abierta por nosotros; abrirla de nuevo puede fallar
-                disponibles.append(i)
-                continue
-            cap = cv2.VideoCapture(i, cv2.CAP_AVFOUNDATION)
-            if cap.isOpened():
-                ret, _ = cap.read()
-                if ret:
-                    disponibles.append(i)
-            cap.release()
-        self._camaras_cache = disponibles
-        return disponibles
+        if self._camaras_cache is None or forzar:
+            self._camaras_cache = core_camara.listar_camaras(ocupada=self._id_camara)
+        return self._camaras_cache
+
+    @property
+    def id_camara(self):
+        return self._id_camara
 
     def esta_abierta(self):
-        return self.cap is not None and self.cap.isOpened()
+        return self.camara is not None
 
-    def abrir_camara(self, indice=0):
+    def abrir_camara(self, id_camara='usb:0'):
+        if isinstance(id_camara, int):
+            id_camara = f'usb:{id_camara}'
         with self._lock_camara:
-            return self._abrir_camara(indice)
-
-    def _abrir_camara(self, indice):
-        if self.cap is not None and self._indice_actual == indice and self.cap.isOpened():
+            # Si ya esta abierta la misma, no reiniciar (conserva el zoom)
+            if self.camara is not None and self._id_camara == id_camara:
+                return True
+            if self.camara is not None:
+                self.camara.cerrar()
+                self.camara = None
+                self._id_camara = None
+            camara = core_camara.abrir_camara(id_camara, self.ancho_deseado, self.alto_deseado)
+            if camara is None:
+                print(f"No se pudo abrir la camara {id_camara}")
+                return False
+            self.camara = camara
+            self._id_camara = id_camara
+            ancho, alto = camara.resolucion()
+            print(f"Camara {id_camara} abierta a {ancho}x{alto}")
             return True
-        if self.cap is not None:
-            self.cap.release()
-        self.cap = cv2.VideoCapture(indice, cv2.CAP_AVFOUNDATION)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.ancho_deseado)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.alto_deseado)
-        if not self.cap.isOpened():
-            print(f"No se pudo abrir la camara {indice}")
-            return False
-        self._indice_actual = indice
-        ancho_real = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        alto_real = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        print(f"Camara {indice} abierta a {ancho_real}x{alto_real}")
-        return True
 
     def cerrar_camara(self):
         with self._lock_camara:
-            if self.cap is not None:
-                self.cap.release()
-                self.cap = None
-                self._indice_actual = None
+            if self.camara is not None:
+                self.camara.cerrar()
+                self.camara = None
+                self._id_camara = None
                 print("Camara cerrada.")
 
     def leer_frame(self):
         with self._lock_camara:
-            if self.cap is None:
+            if self.camara is None:
                 return None
-            ret, frame = self.cap.read()
-        if not ret:
-            return None
-        return frame
+            return self.camara.leer()
 
     def _predecir(self, frame):
         return self.model.predict(

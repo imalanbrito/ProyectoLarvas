@@ -1,4 +1,3 @@
-import os
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -7,9 +6,6 @@ from core_detector import DetectorLarvas
 from core_procesador import ProcesadorVideo
 from core_archivos import cargar_calibracion, exportar_excel_por_captura
 
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, 'runs', 'larvas_v2', 'weights', 'best.pt')
 
 
 class AplicacionLarvas:
@@ -25,7 +21,8 @@ class AplicacionLarvas:
         # Mostrar la ventana antes de cargar el modelo (tarda unos segundos)
         self.root.update()
 
-        self.detector = DetectorLarvas(model_path=MODEL_PATH)
+        # Modelo y confianza segun configuracion.py (o config.json)
+        self.detector = DetectorLarvas()
         self.calibracion = cargar_calibracion()
         self.procesador = ProcesadorVideo(self.detector)
         self.procesador.iniciar()

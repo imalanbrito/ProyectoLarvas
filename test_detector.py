@@ -11,7 +11,7 @@ def main():
         print("No hay camaras conectadas.")
         return
 
-    indice = int(input(f"Elige camara {camaras}: "))
+    indice = input(f"Elige camara {camaras}: ").strip()
     if not detector.abrir_camara(indice):
         return
 

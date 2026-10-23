@@ -2,6 +2,7 @@ import time
 from datetime import datetime, timedelta
 import cv2
 import os
+from collections import deque
 
 from core_archivos import agregar_captura_csv, agregar_periodo_csv
 
@@ -25,7 +26,9 @@ class SesionCaptura:
         self.ultima_captura = 0
         self.numero_captura = 0
         self.sesion_id = None
-        self.capturas = []
+        # Solo las mas recientes en memoria (el CSV tiene todas)
+        self.capturas = deque(maxlen=1000)
+        self.larvas_acumuladas = 0
         self.ruta_csv = None
 
         if self.guardar_imagenes:
@@ -35,7 +38,9 @@ class SesionCaptura:
         self.activa = True
         self.pausada = False
         self.numero_captura = 0
-        self.capturas = []
+        # Solo las mas recientes en memoria (el CSV tiene todas)
+        self.capturas = deque(maxlen=1000)
+        self.larvas_acumuladas = 0
         self.periodos = []
         self.inicio = time.time()
         # La primera captura se toma de inmediato
@@ -176,6 +181,7 @@ class SesionCaptura:
             'detecciones': detecciones
         }
         self.capturas.append(registro_captura)
+        self.larvas_acumuladas += registro_captura['n_larvas']
         # Guardado incremental para no perder datos si la app se cierra
         try:
             agregar_captura_csv(self.ruta_csv, registro_captura)

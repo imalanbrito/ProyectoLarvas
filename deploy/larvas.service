@@ -1,0 +1,18 @@
+# Plantilla del servicio. deploy/instalar_pi.sh reemplaza __USUARIO__ y __CARPETA__
+[Unit]
+Description=Proyecto Larvas - deteccion y pagina web
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=__USUARIO__
+WorkingDirectory=__CARPETA__
+ExecStart=__CARPETA__/venv_pi/bin/python servidor_web.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+Environment=MPLBACKEND=Agg
+SupplementaryGroups=video
+
+[Install]
+WantedBy=multi-user.target

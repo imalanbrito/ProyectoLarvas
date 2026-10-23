@@ -3,6 +3,7 @@ import time
 
 from core_detector import crear_mascara_roi
 from core_medidor import calcular_medidas_desde_mascara
+from configuracion import CONFIG
 
 
 class ProcesadorVideo:
@@ -22,6 +23,8 @@ class ProcesadorVideo:
         self._seq = 0
         self._activo = threading.Event()
         self._hilo = None
+        self.segundos_entre_detecciones = CONFIG['segundos_entre_detecciones']
+        self._ultima_deteccion = 0
 
     def iniciar(self):
         self._activo.set()
@@ -58,6 +61,10 @@ class ProcesadorVideo:
                 roi_mask = self._roi_mask
 
             if self.detectar:
+                # Se leen todos los frames (asi la imagen siempre es actual), pero se detecta solo cada tanto
+                if time.time() - self._ultima_deteccion < self.segundos_entre_detecciones:
+                    continue
+                self._ultima_deteccion = time.time()
                 try:
                     t0 = time.perf_counter()
                     detecciones = self.detector.detectar(frame, roi_mask=roi_mask)

@@ -1,0 +1,12 @@
+{
+    "camara": null,
+    "imgsz": 1024,
+    "conf": 0.35,
+    "ancho": 1280,
+    "alto": 720,
+    "segundos_entre_detecciones": 1.0,
+    "puerto": 8000,
+    "usuario_web": "larvas",
+    "clave_web": "CAMBIAR_ESTA_CLAVE",
+    "reanudar_muestreo_al_iniciar": true
+}

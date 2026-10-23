@@ -1,0 +1,9 @@
+# Paquetes de Python para la Raspberry Pi (los instala deploy/instalar_pi.sh)
+# Misma version de Ultralytics que exporto el modelo
+ultralytics==8.4.148
+ncnn
+flask>=3.0
+waitress>=3.0
+pandas
+openpyxl
+matplotlib

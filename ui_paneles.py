@@ -2,13 +2,15 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import cv2
 from PIL import Image, ImageTk
-import numpy as np
 import math
 import os
 import subprocess
 import sys
 
 from core_archivos import guardar_calibracion
+from core_dibujo import anotar_frame, dibujar_puntos_calibracion
+from core_medidor import calcular_calibracion
+import core_grafica
 
 
 # ==========================================================
@@ -118,7 +120,7 @@ class PanelCalibracion(ttk.Frame):
                         command=self._on_forma_cambiada).pack(side='left', padx=5)
 
         ttk.Label(top, text="Camara:").pack(side='left', padx=(20, 5))
-        self.combo_camara = ttk.Combobox(top, width=5, state='readonly')
+        self.combo_camara = ttk.Combobox(top, width=8, state='readonly')
         self.combo_camara.pack(side='left')
         self._refrescar_camaras()
 
@@ -204,7 +206,7 @@ class PanelCalibracion(ttk.Frame):
         if not self.combo_camara.get():
             messagebox.showwarning("Sin camara", "No hay camaras disponibles.")
             return
-        indice = int(self.combo_camara.get())
+        indice = self.combo_camara.get()
         if not self.detector.abrir_camara(indice):
             messagebox.showerror("Error", f"No se pudo abrir la camara {indice}")
             return
@@ -256,17 +258,7 @@ class PanelCalibracion(ttk.Frame):
     def _dibujar(self):
         if self.frame_actual is None:
             return
-        copia = self.frame_actual.copy()
-        for i, p in enumerate(self.puntos):
-            cv2.circle(copia, p, 5, (0, 255, 0), -1)
-            cv2.putText(copia, str(i + 1), (p[0] + 10, p[1] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-        if self.forma.get() == 'r' and len(self.puntos) == 4:
-            pts = np.array(self.puntos, np.int32).reshape((-1, 1, 2))
-            cv2.polylines(copia, [pts], True, (255, 0, 0), 2)
-        elif self.forma.get() == 'c' and len(self.puntos) == 2:
-            radio = int(math.dist(self.puntos[0], self.puntos[1]))
-            cv2.circle(copia, self.puntos[0], radio, (255, 0, 0), 2)
+        copia = dibujar_puntos_calibracion(self.frame_actual, self.puntos, self.forma.get())
         self.visor.mostrar(copia)
 
     def _on_canvas_resize(self, event):
@@ -293,43 +285,17 @@ class PanelCalibracion(ttk.Frame):
 
     def _guardar(self):
         try:
-            forma = self.forma.get()
-            if forma == 'r':
-                if len(self.puntos) != 4:
-                    messagebox.showerror("Error", "Necesitas 4 puntos para rectangulo.")
-                    return
-                base_real = float(self.entry_base.get())
-                altura_real = float(self.entry_altura.get())
-                dist_12 = math.dist(self.puntos[0], self.puntos[1])
-                dist_23 = math.dist(self.puntos[1], self.puntos[2])
-                factor_x = base_real / dist_12
-                factor_y = altura_real / dist_23
-                factor = (factor_x + factor_y) / 2
-                area = base_real * altura_real
-                datos = {
-                    "forma": "r", "puntos": self.puntos,
-                    "base_cm": base_real, "altura_cm": altura_real,
-                    "factor_escala": factor, "area_cm2": area
-                }
-            else:
-                if len(self.puntos) != 2:
-                    messagebox.showerror("Error", "Necesitas 2 puntos para circulo.")
-                    return
-                radio_real = float(self.entry_radio.get())
-                dist_px = math.dist(self.puntos[0], self.puntos[1])
-                factor = radio_real / dist_px
-                area = math.pi * (radio_real ** 2)
-                datos = {
-                    "forma": "c", "puntos": self.puntos,
-                    "radio_cm": radio_real,
-                    "factor_escala": factor, "area_cm2": area
-                }
+            datos = calcular_calibracion(
+                self.forma.get(), self.puntos,
+                base_cm=self.entry_base.get(), altura_cm=self.entry_altura.get(), radio_cm=self.entry_radio.get()
+            )
+            factor, area = datos['factor_escala'], datos['area_cm2']
             guardar_calibracion(datos)
             self.on_calibracion_guardada(datos)
             self.label_actual.config(text=describir_calibracion(datos))
             self.notificar(f"Calibracion guardada. Factor: {factor:.4f} cm/px, Area: {area:.2f} cm2")
-        except ValueError:
-            messagebox.showerror("Error", "Ingresa valores numericos validos.")
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
@@ -372,7 +338,7 @@ class PanelDeteccion(ttk.Frame):
         top.pack(fill='x', padx=10, pady=(10, 0))
 
         ttk.Label(top, text="Camara:").pack(side='left')
-        self.combo_camara = ttk.Combobox(top, width=5, state='readonly')
+        self.combo_camara = ttk.Combobox(top, width=8, state='readonly')
         self.combo_camara.pack(side='left', padx=5)
         self._refrescar_camaras()
 
@@ -485,7 +451,7 @@ class PanelDeteccion(ttk.Frame):
             messagebox.showwarning("Sin camara", "No hay camaras.")
             return
 
-        indice = int(self.combo_camara.get())
+        indice = self.combo_camara.get()
         if not self.detector.abrir_camara(indice):
             messagebox.showerror("Error", "No se pudo abrir la camara.")
             return
@@ -634,7 +600,7 @@ class PanelDeteccion(ttk.Frame):
         self.on_captura_registrada(registro)
         self._on_periodo(self.sesion.periodo_en_curso())
 
-        total_larvas = sum(c['n_larvas'] for c in self.sesion.capturas)
+        total_larvas = self.sesion.larvas_acumuladas
         self.label_contador.config(
             text=f"Capturas: {self.sesion.numero_captura} | Larvas acumuladas: {total_larvas}"
         )
@@ -667,45 +633,17 @@ class PanelDeteccion(ttk.Frame):
         )
 
     def _anotar(self, res, detecciones, encabezado, color_encabezado=(0, 255, 255), completo=True):
-        frame = res['frame'].copy()
         roi_mask = res['roi_mask']
-        forma = self.calibracion['forma']
-        puntos = self.calibracion['puntos']
-        ver_cajas = completo or self.ver_cajas.get()
-        ver_ids = completo or self.ver_ids.get()
-        ver_medidas = completo or self.ver_medidas.get()
-
-        if roi_mask is not None:
-            if roi_mask is not self._roi_src:
-                self._roi_src = roi_mask
-                self._fuera_roi = roi_mask == 0
-            frame[self._fuera_roi] = (frame[self._fuera_roi] * 0.4).astype(np.uint8)
-
-        if forma == 'r':
-            pts = np.array(puntos, np.int32).reshape((-1, 1, 2))
-            cv2.polylines(frame, [pts], True, (0, 255, 255), 2)
-        elif forma == 'c':
-            radio = int(math.dist(puntos[0], puntos[1]))
-            cv2.circle(frame, tuple(puntos[0]), radio, (0, 255, 255), 2)
-
-        for d in detecciones:
-            x1, y1, x2, y2 = d['box']
-            if ver_cajas:
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            if ver_ids:
-                etiqueta = f"ID {d['id_captura']}" if 'id_captura' in d else f"ID {d['id']}"
-                cv2.putText(frame, etiqueta, (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-
-            medidas = d.get('medidas')
-            if medidas and ver_medidas:
-                cv2.putText(frame, f"L:{medidas['largo_cm']:.2f} A:{medidas['ancho_cm']:.2f}",
-                            (x1, y2 + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-                cv2.putText(frame, f"P:{medidas['peso_g']:.4f}g",
-                            (x1, y2 + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-
-        cv2.putText(frame, encabezado, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_encabezado, 2)
-        return frame
+        if roi_mask is not None and roi_mask is not self._roi_src:
+            self._roi_src = roi_mask
+            self._fuera_roi = roi_mask == 0
+        return anotar_frame(
+            res['frame'], detecciones, self.calibracion, roi_mask, encabezado, color_encabezado,
+            ver_cajas=completo or self.ver_cajas.get(),
+            ver_ids=completo or self.ver_ids.get(),
+            ver_medidas=completo or self.ver_medidas.get(),
+            fuera_roi=self._fuera_roi if roi_mask is not None else None,
+        )
 
     def _on_canvas_resize(self, event):
         if self.frame_actual is not None:
@@ -884,89 +822,37 @@ class PanelRegistro(ttk.Frame):
 # ==========================================================
 # PANEL DE TENDENCIA (grafica de la sesion actual)
 # ==========================================================
-COLOR_CAPTURA = '#2a78d6'
-COLOR_PERIODO = '#eb6834'
-COLOR_TEXTO = '#5f5e5a'
-COLOR_GRILLA = '#e6e5e0'
-
-
 class PanelTendencia(ttk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
-        from matplotlib.figure import Figure
         from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-        self._capturas = []   # (minuto, larvas, largo promedio)
+        self._puntos = []     # (minuto, larvas, largo promedio)
         self._periodos = {}   # numero -> resumen
 
         self.label_sesion = ttk.Label(self, text="Inicia un muestreo para ver la tendencia.")
         self.label_sesion.pack(padx=10, pady=(10, 0), anchor='w')
 
-        self.figura = Figure(figsize=(8, 6), dpi=100)
-        self.ax_larvas, self.ax_largo = self.figura.subplots(2, 1, sharex=True)
+        self.figura, self.ax_larvas, self.ax_largo = core_grafica.crear_figura()
         self.canvas = FigureCanvasTkAgg(self.figura, master=self)
         self.canvas.get_tk_widget().pack(fill='both', expand=True, padx=10, pady=10)
         self._dibujar()
 
     def nueva_sesion(self, sesion_id):
-        self._capturas = []
+        self._puntos = []
         self._periodos = {}
         self.label_sesion.config(text=f"Sesion: {sesion_id}")
         self._dibujar()
 
     def agregar_captura(self, captura):
-        medidas = [d['medidas']['largo_cm'] for d in captura['detecciones'] if 'medidas' in d]
-        largo = sum(medidas) / len(medidas) if medidas else None
-        self._capturas.append((captura['t_rel'] / 60, captura['n_larvas'], largo))
+        self._puntos.append(core_grafica.punto_de_captura(captura))
         self._dibujar()
 
     def actualizar_periodo(self, resumen):
         self._periodos[resumen['numero']] = resumen
         self._dibujar()
 
-    def _estilo(self, ax, titulo):
-        ax.set_title(titulo, loc='left', fontsize=10, color=COLOR_TEXTO)
-        ax.grid(axis='y', color=COLOR_GRILLA, linewidth=0.8)
-        ax.set_axisbelow(True)
-        for lado in ('top', 'right'):
-            ax.spines[lado].set_visible(False)
-        for lado in ('left', 'bottom'):
-            ax.spines[lado].set_color(COLOR_GRILLA)
-        ax.tick_params(colors=COLOR_TEXTO, labelsize=8)
-
-    def _serie(self, ax, valores, clave_periodo, decimales):
-        puntos = [(t, v) for t, v in valores if v is not None]
-        if puntos:
-            xs, ys = zip(*puntos)
-            ax.plot(xs, ys, color=COLOR_CAPTURA, linewidth=1.5, marker='o', markersize=4,
-                    label='Cada captura')
-        etiquetado = False
-        for r in self._periodos.values():
-            if r[clave_periodo] is None:
-                continue
-            ax.hlines(r[clave_periodo], r['t_inicio'] / 60, r['t_fin'] / 60, color=COLOR_PERIODO,
-                      linewidth=2.5, label=None if etiquetado else 'Promedio del periodo')
-            etiquetado = True
-            ax.annotate(f"{r[clave_periodo]:.{decimales}f}", (r['t_fin'] / 60, r[clave_periodo]),
-                        xytext=(4, 0), textcoords='offset points', va='center',
-                        fontsize=8, color=COLOR_TEXTO)
-
     def _dibujar(self):
-        for ax in (self.ax_larvas, self.ax_largo):
-            ax.clear()
-        self._estilo(self.ax_larvas, "Larvas detectadas")
-        self._estilo(self.ax_largo, "Largo promedio (cm)")
-        self._serie(self.ax_larvas, [(t, n) for t, n, _ in self._capturas], 'larvas_prom', 1)
-        self._serie(self.ax_largo, [(t, l) for t, _, l in self._capturas], 'largo_prom', 2)
-        from matplotlib.ticker import MaxNLocator
-        self.ax_larvas.yaxis.set_major_locator(MaxNLocator(integer=True))
-        self.ax_larvas.set_ylim(bottom=-0.3)
-        self.ax_largo.set_xlabel("Minutos desde el inicio", fontsize=9, color=COLOR_TEXTO)
-        # Una sola leyenda arriba, fuera de los datos
-        for leyenda in self.figura.legends:
-            leyenda.remove()
-        if self._capturas:
-            self.figura.legend(*self.ax_larvas.get_legend_handles_labels(), loc='upper right',
-                               bbox_to_anchor=(0.97, 1), ncol=2, fontsize=8, frameon=False)
-        self.figura.tight_layout(rect=(0, 0, 1, 0.95))
+        core_grafica.dibujar_tendencia(self.figura, self.ax_larvas, self.ax_largo,
+                                       self._puntos, list(self._periodos.values()))
         self.canvas.draw_idle()

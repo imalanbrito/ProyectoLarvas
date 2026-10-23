@@ -1,0 +1,9 @@
+# Paquetes de Python para Mac, Windows y Linux (en Raspberry Pi usar deploy/instalar_pi.sh)
+# Con tarjeta NVIDIA: instalar antes PyTorch con CUDA desde https://pytorch.org (ver README)
+ultralytics==8.4.148
+flask>=3.0
+waitress>=3.0
+pandas
+openpyxl
+matplotlib
+# Opcional, en computadoras sin GPU: pip install ncnn  (ver README, "Va lento")
