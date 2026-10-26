@@ -1,10 +1,10 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from ui_paneles import PanelCalibracion, PanelDeteccion, PanelRegistro, PanelTendencia
-from core_detector import DetectorLarvas
-from core_procesador import ProcesadorVideo
-from core_archivos import cargar_calibracion, exportar_excel_por_captura
+from nucleo.ui_paneles import PanelCalibracion, PanelDeteccion, PanelRegistro, PanelTendencia
+from nucleo.core_detector import DetectorLarvas
+from nucleo.core_procesador import ProcesadorVideo
+from nucleo.core_archivos import cargar_calibracion, exportar_excel_por_captura
 
 
 
@@ -21,7 +21,7 @@ class AplicacionLarvas:
         # Mostrar la ventana antes de cargar el modelo (tarda unos segundos)
         self.root.update()
 
-        # Modelo y confianza segun configuracion.py (o config.json)
+        # Modelo y confianza segun nucleo/configuracion.py (o config.json)
         self.detector = DetectorLarvas()
         self.calibracion = cargar_calibracion()
         self.procesador = ProcesadorVideo(self.detector)

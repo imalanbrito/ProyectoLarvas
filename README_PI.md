@@ -10,7 +10,7 @@ igual en la Mac.
 - Tarjeta microSD de 32 GB o mas (o un SSD).
 - Una camara: **webcam USB** o **Pi Camera Module** (cable plano). Se puede usar cualquiera.
 - En la Mac: este proyecto con el modelo en `runs/larvas_v2/weights/` (`best.pt` y `best_ncnn_model/`).
-  Si falta `best_ncnn_model`, crearlo con `python exportar_modelo_pi.py`.
+  Si falta `best_ncnn_model`, crearlo con `python herramientas/exportar_modelo_pi.py`.
 
 ## 2. Preparar la Pi (una sola vez)
 
@@ -26,6 +26,12 @@ Encender la Pi y comprobar desde la Mac que responde:
 
 ```bash
 ssh usuario@larvas.local
+```
+
+Ya dentro de la Pi, instalar `rsync` (lo usa el script de copia del paso 3):
+
+```bash
+sudo apt update && sudo apt install -y rsync
 ```
 
 ## 3. Copiar el proyecto desde la Mac
@@ -56,14 +62,15 @@ Desde ese momento el programa arranca solo cada vez que se enciende la Pi.
 
 ## 5. Usar la pagina web
 
-1. Elegir la camara (boton **Buscar** si no aparece) y pulsar **Preview**.
-2. Pestana **Calibracion**: *Tomar imagen*, hacer clic en los puntos del contenedor
+1. Elegir la camara (boton **Buscar** si no aparece).
+2. Pestana **Calibracion**: *Tomar imagen* (abre la camara), hacer clic en los puntos del contenedor
    (rectangulo: 4 esquinas en orden, base = 1-2 y altura = 2-3; circulo: centro y borde),
    escribir las medidas reales y **Guardar calibracion**. La Pi tiene su propia calibracion,
    porque la camara y la distancia son distintas a las de la Mac.
-3. Poner *Captura cada (s)* y *Promediar cada (min)* y pulsar **Comenzar muestreo**.
-4. Seguir el avance en las pestanas **Periodos**, **Capturas** y **Tendencia**.
-5. Pestana **Descargas**: Excel, CSV e imagenes de cada sesion.
+3. **Preview** para revisar que las larvas se detecten bien (necesita la calibracion del paso 2).
+4. Poner *Captura cada (s)* y *Promediar cada (min)* y pulsar **Comenzar muestreo**.
+5. Seguir el avance en las pestanas **Periodos**, **Capturas** y **Tendencia**.
+6. Pestana **Descargas**: Excel, CSV e imagenes de cada sesion.
 
 Si se corta la luz durante un muestreo, al volver la Pi empieza una sesion nueva con los mismos
 parametros (se puede desactivar con `"reanudar_muestreo_al_iniciar": false`).
@@ -96,7 +103,7 @@ pero para la pagina web se necesita Tailscale.
 ```bash
 ssh usuario@larvas
 cd ProyectoLarvas
-venv_pi/bin/python ver_estado.py        # resumen: sesion, capturas, periodos
+venv_pi/bin/python herramientas/ver_estado.py        # resumen: sesion, capturas, periodos
 journalctl -u larvas -f                 # lo que va haciendo el programa (Ctrl+C para salir)
 sudo systemctl restart larvas           # reiniciar el programa
 sudo systemctl stop larvas              # detenerlo (start para iniciarlo)
@@ -123,7 +130,7 @@ Despues de cambiarlo: `sudo systemctl restart larvas`.
 
 - En la Pi el modelo corre en el procesador (formato NCNN). Se estima **0.5 a 1 s por imagen**;
   el valor real aparece en la pagina ("Deteccion"). Con capturas cada 60 s sobra tiempo.
-- Si es demasiado lento: `python exportar_modelo_pi.py --imgsz 640` y poner `"imgsz": 640`
+- Si es demasiado lento: `python herramientas/exportar_modelo_pi.py --imgsz 640` y poner `"imgsz": 640`
   (unas 2.5 veces mas rapido, algo peor con larvas muy pequenas).
 - Con el disipador activo la Pi no deberia pasar de ~70 °C. Por encima de 80 °C se frena sola.
 - Cada captura guarda 2 imagenes (con y sin anotaciones), unos 250 KB. Con una captura por minuto

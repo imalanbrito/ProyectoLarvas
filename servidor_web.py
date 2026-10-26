@@ -19,10 +19,10 @@ import pandas as pd
 from flask import Flask, Response, abort, jsonify, request, send_file, send_from_directory
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-import core_grafica
-from configuracion import BASE_DIR, CONFIG
-from core_muestreo import ControladorMuestreo
-from core_sesion import CAPTURAS_DIR
+from nucleo import core_grafica
+from nucleo.configuracion import BASE_DIR, CONFIG
+from nucleo.core_muestreo import ControladorMuestreo
+from nucleo.core_sesion import CAPTURAS_DIR
 
 CARPETA_WEB = os.path.join(BASE_DIR, 'web')
 PATRON_SESION = re.compile(r'^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$')
