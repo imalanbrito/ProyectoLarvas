@@ -29,6 +29,10 @@ if [ -n "$NUMPY_SISTEMA" ]; then
     echo "numpy==$NUMPY_SISTEMA" > "$RESTRICCIONES"
     echo "    numpy del sistema: $NUMPY_SISTEMA"
 fi
+# PyTorch solo para CPU: el paquete normal de PyPI para ARM trae librerias de NVIDIA
+# (varios GB) que la Pi no puede usar. Se instala primero para que pip no baje el otro.
+venv_pi/bin/pip install torch torchvision -c "$RESTRICCIONES" \
+    --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple
 venv_pi/bin/pip install -r requirements-pi.txt -c "$RESTRICCIONES"
 rm -f "$RESTRICCIONES"
 

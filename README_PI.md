@@ -28,6 +28,12 @@ Encender la Pi y comprobar desde la Mac que responde:
 ssh usuario@larvas.local
 ```
 
+Ya dentro de la Pi, instalar `rsync` (lo usa el script de copia del paso 3):
+
+```bash
+sudo apt update && sudo apt install -y rsync
+```
+
 ## 3. Copiar el proyecto desde la Mac
 
 En la Mac, desde la carpeta del proyecto:
@@ -56,14 +62,15 @@ Desde ese momento el programa arranca solo cada vez que se enciende la Pi.
 
 ## 5. Usar la pagina web
 
-1. Elegir la camara (boton **Buscar** si no aparece) y pulsar **Preview**.
-2. Pestana **Calibracion**: *Tomar imagen*, hacer clic en los puntos del contenedor
+1. Elegir la camara (boton **Buscar** si no aparece).
+2. Pestana **Calibracion**: *Tomar imagen* (abre la camara), hacer clic en los puntos del contenedor
    (rectangulo: 4 esquinas en orden, base = 1-2 y altura = 2-3; circulo: centro y borde),
    escribir las medidas reales y **Guardar calibracion**. La Pi tiene su propia calibracion,
    porque la camara y la distancia son distintas a las de la Mac.
-3. Poner *Captura cada (s)* y *Promediar cada (min)* y pulsar **Comenzar muestreo**.
-4. Seguir el avance en las pestanas **Periodos**, **Capturas** y **Tendencia**.
-5. Pestana **Descargas**: Excel, CSV e imagenes de cada sesion.
+3. **Preview** para revisar que las larvas se detecten bien (necesita la calibracion del paso 2).
+4. Poner *Captura cada (s)* y *Promediar cada (min)* y pulsar **Comenzar muestreo**.
+5. Seguir el avance en las pestanas **Periodos**, **Capturas** y **Tendencia**.
+6. Pestana **Descargas**: Excel, CSV e imagenes de cada sesion.
 
 Si se corta la luz durante un muestreo, al volver la Pi empieza una sesion nueva con los mismos
 parametros (se puede desactivar con `"reanudar_muestreo_al_iniciar": false`).

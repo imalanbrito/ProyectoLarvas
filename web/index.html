@@ -167,7 +167,7 @@
     </div>
 
     <div data-panel="calibracion" hidden>
-      <p class="ayuda">1. Abre la camara (Preview). 2. Pulsa "Tomar imagen". 3. Haz clic en los puntos del contenedor:
+      <p class="ayuda">1. Elige la camara arriba en Control. 2. Pulsa "Tomar imagen" (abre la camara si hace falta). 3. Haz clic en los puntos del contenedor:
         rectangulo = 4 esquinas en orden (base = 1-2, altura = 2-3); circulo = centro y un punto del borde.
         4. Escribe las medidas reales y guarda.</p>
       <div class="fila">
@@ -379,11 +379,27 @@ function dibujarCalib() {
   });
   $('calib-estado').textContent = puntos.length < limite() ? `Punto ${puntos.length + 1} de ${limite()}` : 'Puntos completos';
 }
-$('b-tomar').onclick = () => {
-  const img = new Image();
-  img.onload = () => { imagenCalib = img; lienzo.width = img.naturalWidth; lienzo.height = img.naturalHeight; puntos = []; dibujarCalib(); };
-  img.onerror = () => aviso('No hay imagen. Abre la camara con Preview primero.', true);
-  img.src = '/crudo.jpg?t=' + Date.now();
+function cargarImagen(url) {
+  return new Promise((ok, mal) => { const img = new Image(); img.onload = () => ok(img); img.onerror = mal; img.src = url; });
+}
+$('b-tomar').onclick = async () => {
+  // Para calibrar no hace falta Preview (que pide calibracion): se abre la camara elegida si no esta abierta
+  if (!estado || !estado.camara) {
+    $('calib-estado').textContent = 'Abriendo camara...';
+    const r = await api('/api/accion', { accion: 'abrir_camara', camara: $('camara').value });
+    if (!r.ok) { aviso(r.mensaje, true); $('calib-estado').textContent = ''; return; }
+    actualizar();
+  }
+  // La primera imagen puede tardar un momento en llegar
+  for (let intento = 0; intento < 10; intento++) {
+    try {
+      const img = await cargarImagen('/crudo.jpg?t=' + Date.now());
+      imagenCalib = img; lienzo.width = img.naturalWidth; lienzo.height = img.naturalHeight; puntos = []; dibujarCalib();
+      return;
+    } catch (e) { await new Promise(r => setTimeout(r, 500)); }
+  }
+  aviso('La camara no entrega imagen. Prueba con otra camara (boton Buscar).', true);
+  $('calib-estado').textContent = '';
 };
 lienzo.addEventListener('click', ev => {
   if (!imagenCalib || puntos.length >= limite()) return;

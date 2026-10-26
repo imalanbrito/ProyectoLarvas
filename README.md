@@ -281,7 +281,7 @@ La seccion **Sesion** muestra cuanto falta para la proxima captura (barra azul) 
 
 ![Pestana Calibracion](docs/img/web_calibracion.png)
 
-Con la camara abierta (*Preview*): **Tomar imagen**, hacer clic en las esquinas del contenedor en orden
+Elegir la camara en *Control* y pulsar **Tomar imagen** (abre la camara si hace falta); hacer clic en las esquinas del contenedor en orden
 (1 y 2 = base, 2 y 3 = altura) o, si es circular, en el centro y en un punto del borde. Escribir las
 medidas reales y **Guardar calibracion**. *Deshacer punto* borra el ultimo clic.
 
