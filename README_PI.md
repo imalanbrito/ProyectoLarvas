@@ -75,6 +75,17 @@ Desde ese momento el programa arranca solo cada vez que se enciende la Pi.
 Si se corta la luz durante un muestreo, al volver la Pi empieza una sesion nueva con los mismos
 parametros (se puede desactivar con `"reanudar_muestreo_al_iniciar": false`).
 
+## Monitor conectado a la Pi
+
+Si la Pi tiene escritorio (Raspberry Pi OS con escritorio) y un monitor, al encender se abre la misma
+pagina a pantalla completa. Es el mismo programa que se ve desde la red: lo que se haga en el monitor se
+ve desde la Mac o el celular, y al reves. Funciona sin internet y en el monitor no pide contrasena.
+
+- **Salir de la pantalla completa:** boton **Cerrar** arriba a la derecha (pulsarlo dos veces), o Alt+F4.
+  El programa sigue funcionando: el muestreo continua y se puede ver desde la red. El boton solo aparece en el monitor.
+- **Volver a abrirla:** icono **Proyecto Larvas** del escritorio o del menu.
+- **Que no se abra sola al encender:** `"abrir_pantalla_local": false` en `config.json`.
+
 ## 6. Acceso desde cualquier lugar (internet)
 
 No abrir puertos en el router. Usar **Tailscale** (gratis), que crea una red privada entre tus equipos:
@@ -124,6 +135,7 @@ df -h ~                                 # espacio en disco
 | `puerto` | Puerto de la pagina web (8000) |
 | `usuario_web`, `clave_web` | Usuario y contrasena de la pagina |
 | `reanudar_muestreo_al_iniciar` | Retomar el muestreo despues de un corte de luz |
+| `abrir_pantalla_local` | Abrir la pagina a pantalla completa en el monitor de la Pi al encender |
 
 Despues de cambiarlo: `sudo systemctl restart larvas`.
 

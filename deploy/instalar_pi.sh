@@ -78,6 +78,25 @@ sudo systemctl daemon-reload
 sudo systemctl enable larvas
 sudo systemctl restart larvas
 
+echo "==> Pantalla local (monitor conectado a la Pi)"
+if command -v chromium >/dev/null && systemctl get-default | grep -q graphical; then
+    mkdir -p "$HOME/.config/autostart" "$HOME/.local/share/applications"
+    # Al iniciar sesion: abrir la pagina a pantalla completa
+    sed -e "s|__CARPETA__|$CARPETA|g" -e "s| __ARGS__||" deploy/larvas-pantalla.desktop \
+        > "$HOME/.config/autostart/larvas-pantalla.desktop"
+    # Icono en el menu y en el escritorio para volver a abrirla (aunque el inicio automatico este desactivado)
+    sed -e "s|__CARPETA__|$CARPETA|g" -e "s|__ARGS__|--forzar|" deploy/larvas-pantalla.desktop \
+        > "$HOME/.local/share/applications/larvas-pantalla.desktop"
+    ESCRITORIO="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
+    if [ -d "$ESCRITORIO" ]; then
+        cp "$HOME/.local/share/applications/larvas-pantalla.desktop" "$ESCRITORIO/"
+        chmod +x "$ESCRITORIO/larvas-pantalla.desktop"
+    fi
+    echo "    Al encender, el programa se abre en el monitor (salir: Alt+F4; volver: icono Proyecto Larvas)"
+else
+    echo "    Sin escritorio grafico: solo pagina web"
+fi
+
 PUERTO="$(venv_pi/bin/python -c 'from nucleo.configuracion import CONFIG; print(CONFIG["puerto"])')"
 echo
 echo "Listo. Abre en el navegador:"

@@ -1,7 +1,9 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" translate="no">
 <head>
 <meta charset="utf-8">
+<!-- La pagina ya esta en espanol: que el navegador no ofrezca traducirla -->
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Proyecto Larvas</title>
 <style>
@@ -87,7 +89,10 @@
     <h1>Proyecto Larvas</h1>
     <div class="meta" id="meta">Conectando...</div>
   </div>
-  <span class="pastilla" id="pastilla">—</span>
+  <div class="fila" style="margin:0">
+    <span class="pastilla" id="pastilla">—</span>
+    <button id="b-salir" hidden title="Cierra esta ventana; el programa sigue funcionando">Cerrar</button>
+  </div>
 </header>
 
 <main>
@@ -260,7 +265,9 @@ async function actualizar() {
   else if (e.modo === 'preview') { p.textContent = 'Preview'; p.className = 'pastilla preview'; }
   else { p.textContent = e.camara ? 'Camara abierta' : 'Detenido'; p.className = 'pastilla'; }
 
-  if ($('camara').options.length === 0 || (e.camaras.length && $('camara').options.length !== e.camaras.length)) llenarCamaras(e.camaras);
+  // Rehacer la lista solo si cambiaron las camaras (comparando sus nombres, no cuantas son)
+  const enLista = Array.from($('camara').options).map(o => o.value).filter(Boolean).join(',');
+  if ($('camara').options.length === 0 || enLista !== e.camaras.join(',')) llenarCamaras(e.camaras);
   if (document.activeElement !== $('conf')) { $('conf').value = e.conf; $('conf-valor').textContent = fmt(e.conf); }
 
   $('c-larvas').textContent = e.larvas_ahora === null ? '—' : e.larvas_ahora;
@@ -277,6 +284,7 @@ async function actualizar() {
   $('s-calib').textContent = !c ? 'Sin calibrar' : (c.forma === 'r' ? `Rectangulo ${c.base_cm} x ${c.altura_cm} cm` : `Circulo, radio ${c.radio_cm} cm`) + ` · ${fmt(c.factor_escala, 4)} cm/px`;
   $('barra').style.width = s && !s.pausada && s.proxima_captura_s !== null ? `${100 * (1 - s.proxima_captura_s / s.intervalo)}%` : '0';
   $('mensaje').textContent = e.mensaje || '';
+  $('b-salir').hidden = !e.pantalla_local;
 
   $('b-muestreo').disabled = !!s;
   $('b-pausa').disabled = !s; $('b-pausa').textContent = s && s.pausada ? 'Reanudar' : 'Pausar';
@@ -433,12 +441,19 @@ $('b-cerrar').onclick = () => { if (!estado.sesion || confirmarDetener()) accion
 $('conf').oninput = () => $('conf-valor').textContent = fmt($('conf').value);
 $('conf').onchange = () => accion('conf', { valor: $('conf').value });
 
-let detenerArmado = 0;
-function confirmarDetener() {
-  // Segundo clic dentro de 4 s confirma (evita detener un muestreo largo por error)
-  if (Date.now() - detenerArmado < 4000) { detenerArmado = 0; return true; }
-  detenerArmado = Date.now(); aviso('Pulsa de nuevo para detener el muestreo.'); return false;
+// Segundo clic dentro de 4 s confirma (evita detener un muestreo o cerrar la pantalla por error)
+const armado = {};
+function confirmar(clave, mensaje) {
+  if (Date.now() - (armado[clave] || 0) < 4000) { armado[clave] = 0; return true; }
+  armado[clave] = Date.now(); aviso(mensaje); return false;
 }
+function confirmarDetener() { return confirmar('detener', 'Pulsa de nuevo para detener el muestreo.'); }
+
+$('b-salir').onclick = async () => {
+  if (!confirmar('salir', 'Pulsa de nuevo para cerrar la pantalla (el programa sigue funcionando).')) return;
+  const r = await api('/api/cerrar_pantalla', {});
+  aviso(r.mensaje, !r.ok);
+};
 
 // Precargar valores de calibracion guardados
 (async () => {

@@ -34,6 +34,8 @@ POR_DEFECTO = {
     "usuario_web": "larvas",
     # Si esta vacia, la pagina web no pide contrasena (no recomendado si se accede desde internet)
     "clave_web": "",
+    # Raspberry Pi con monitor: abrir la pagina a pantalla completa al encender (deploy/pantalla_pi.sh)
+    "abrir_pantalla_local": True,
     # Si se corta la luz durante un muestreo, al volver se inicia uno nuevo con los mismos parametros
     "reanudar_muestreo_al_iniciar": True,
 }

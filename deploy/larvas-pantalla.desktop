@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Proyecto Larvas
+Comment=Abre el programa a pantalla completa (salir con Alt+F4)
+Exec=bash __CARPETA__/deploy/pantalla_pi.sh __ARGS__
+Icon=camera-web
+Terminal=false
+Categories=Science;

@@ -11,6 +11,7 @@ import io
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 import threading
 from functools import wraps
@@ -31,9 +32,22 @@ app = Flask(__name__)
 control = None
 
 
+# Ventana a pantalla completa que abre deploy/pantalla_pi.sh (su perfil de Chromium se llama asi)
+PATRON_PANTALLA = 'chromium.*larvas-pantalla'
+
+
+def _es_local():
+    """La peticion viene de la propia maquina (el monitor conectado a la Pi), no de la red."""
+    return request.remote_addr in ('127.0.0.1', '::1')
+
+
 # ------- Contrasena (HTTP Basic) -------
 def _autorizado():
     if not CONFIG['clave_web']:
+        return True
+    # El monitor conectado a la Pi abre la pagina desde la misma maquina: no pedir contrasena.
+    # Cualquier acceso por la red (incluido Tailscale) llega con otra direccion y si la pide
+    if _es_local():
         return True
     auth = request.authorization
     return (auth is not None
@@ -67,7 +81,23 @@ def estaticos(archivo):
 # ------- Estado y datos -------
 @app.route('/api/estado')
 def api_estado():
-    return jsonify(control.estado())
+    estado = control.estado()
+    # La pagina muestra el boton "Cerrar" solo en el monitor de la Pi
+    estado['pantalla_local'] = _es_local()
+    return jsonify(estado)
+
+
+@app.route('/api/cerrar_pantalla', methods=['POST'])
+def api_cerrar_pantalla():
+    """Cierra la ventana a pantalla completa del monitor. El programa sigue funcionando."""
+    # Desde la red no se puede cerrar la pantalla de la Pi
+    if not _es_local():
+        return jsonify({'ok': False, 'mensaje': "Solo se puede cerrar desde el monitor de la Pi."}), 403
+    if subprocess.run(['pgrep', '-f', PATRON_PANTALLA], capture_output=True).returncode != 0:
+        return _respuesta((False, "No hay una ventana a pantalla completa abierta."))
+    # Esperar un momento para que la respuesta llegue a la pagina antes de cerrar el navegador
+    threading.Timer(0.5, lambda: subprocess.run(['pkill', '-f', PATRON_PANTALLA])).start()
+    return _respuesta((True, "Cerrando la pantalla. El programa sigue funcionando."))
 
 
 @app.route('/api/capturas')

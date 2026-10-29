@@ -69,6 +69,19 @@ class ControladorMuestreo:
         self._activo.set()
         self._hilo = threading.Thread(target=self._loop, daemon=True)
         self._hilo.start()
+        # En segundo plano y en este orden: buscar camaras (para que la pagina ya las muestre) y despues
+        # retomar el muestreo si se corto la luz. Seguidos, para no abrir la misma camara dos veces a la vez
+        threading.Thread(target=self._arranque, daemon=True).start()
+
+    def _arranque(self):
+        # Al encender, la webcam (o la que se acaba de soltar al reiniciar) puede tardar unos segundos en responder
+        for _ in range(5):
+            try:
+                if self.listar_camaras(forzar=True):
+                    break
+            except Exception as e:
+                print(f"No se pudieron listar las camaras: {e}")
+            time.sleep(2)
         self._reanudar_si_corresponde()
 
     def detener(self):
@@ -314,6 +327,7 @@ class ControladorMuestreo:
     def estado(self):
         with self._lock:
             res = self.procesador.ultimo_resultado()
+            abierta = self.detector.esta_abierta()
             info = {
                 'modo': self.modo,
                 'mensaje': self.mensaje,
@@ -324,8 +338,9 @@ class ControladorMuestreo:
                 'conf': self.detector.conf,
                 'calibracion': self.calibracion,
                 'resolucion': list(res['frame'].shape[1::-1]) if res is not None and self.detector.esta_abierta() else None,
-                'rendimiento': {'ms': self._rend['ms'], 'fps': self._rend['fps']},
-                'larvas_ahora': len(res['detecciones']) if res is not None and res['detecciones'] is not None else None,
+                'rendimiento': {'ms': self._rend['ms'] if abierta else None, 'fps': self._rend['fps'] if abierta else None},
+                # Solo con la camara abierta (si no, quedaria el conteo de la ultima imagen)
+                'larvas_ahora': len(res['detecciones']) if abierta and res is not None and res['detecciones'] is not None else None,
                 'sesion': None,
                 'sesion_mostrada': self.sesion_mostrada,
                 'disco_libre_gb': round(shutil.disk_usage(BASE_DIR).free / 1e9, 1),
