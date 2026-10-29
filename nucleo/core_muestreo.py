@@ -56,6 +56,8 @@ class ControladorMuestreo:
         self.sesion_mostrada = None
         self.mensaje = "Listo."
         self._ultimo_seq = None
+        # Hora en que se pidio la deteccion en mosaico de una captura (None = no hay una pendiente)
+        self._precisa_pedida = None
         self._ultimo_frame_nuevo = time.time()
         self._rend = {'ms': None, 'fps': None, 'seq': None, 't': None}
         self._lock = threading.RLock()
@@ -175,6 +177,8 @@ class ControladorMuestreo:
                 self._terminar_sesion()
             self.modo = 'idle'
             self.procesador.detectar = False
+            self.procesador.cancelar_deteccion_precisa()
+            self._precisa_pedida = None
             self._guardar_estado(False)
             self.mensaje = "Detenido. La camara sigue abierta."
             return True, self.mensaje
@@ -229,12 +233,25 @@ class ControladorMuestreo:
                 self._ultimo_seq = res['seq']
                 self._ultimo_frame_nuevo = time.time()
                 if res['detecciones'] is not None:
-                    self._medir_rendimiento(res)
-                    if self.modo == 'captura' and self.sesion is not None and self.sesion.debe_capturar():
-                        self._procesar_captura(res)
+                    if not res.get('preciso'):
+                        self._medir_rendimiento(res)
+                    if self.modo == 'captura' and self.sesion is not None:
+                        if self._precisa_pedida is not None:
+                            if res.get('preciso'):
+                                self._precisa_pedida = None
+                                self._procesar_captura(res)
+                        elif self.sesion.debe_capturar():
+                            if self.procesador.usa_mosaico:
+                                # La captura se guarda cuando llegue la deteccion en mosaico (tarda unos segundos)
+                                self.procesador.pedir_deteccion_precisa()
+                                self._precisa_pedida = time.time()
+                            else:
+                                self._procesar_captura(res)
 
+            # Mientras se procesa una captura en mosaico no llegan imagenes nuevas: no es una falla de la camara
+            procesando = self._precisa_pedida is not None and time.time() - self._precisa_pedida < 120
             # Camara desconectada o colgada: intentar reabrirla
-            if (self.modo != 'idle' and self.detector.esta_abierta()
+            if (self.modo != 'idle' and not procesando and self.detector.esta_abierta()
                     and time.time() - self._ultimo_frame_nuevo > SEGUNDOS_SIN_IMAGEN):
                 id_camara = self.detector.id_camara
                 print(f"La camara {id_camara} no entrega imagen, reabriendo...")
@@ -312,6 +329,7 @@ class ControladorMuestreo:
                 'sesion': None,
                 'sesion_mostrada': self.sesion_mostrada,
                 'disco_libre_gb': round(shutil.disk_usage(BASE_DIR).free / 1e9, 1),
+                'mosaico': self.procesador.mosaico if self.procesador.usa_mosaico else None,
             }
             s = self.sesion
             if s is not None:
@@ -321,6 +339,7 @@ class ControladorMuestreo:
                     'pausada': s.pausada, 'capturas': s.numero_captura,
                     'larvas_acumuladas': s.larvas_acumuladas,
                     'proxima_captura_s': s.segundos_restantes(),
+                    'procesando_captura': self._precisa_pedida is not None,
                     'fin_periodo_s': s.segundos_restantes_periodo(),
                     'periodo_actual': en_curso['numero'] if en_curso else None,
                 }

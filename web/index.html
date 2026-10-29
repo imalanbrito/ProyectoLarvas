@@ -268,8 +268,10 @@ async function actualizar() {
   $('c-acum').textContent = s ? s.larvas_acumuladas : '—';
   $('c-rend').textContent = e.rendimiento.ms ? `${Math.round(e.rendimiento.ms)} ms` : '—';
 
-  $('s-id').textContent = s ? `${s.id} (cada ${s.intervalo} s, promedio cada ${s.periodo_min} min)` : (e.sesion_mostrada ? `Ultima: ${e.sesion_mostrada}` : '—');
-  $('s-proxima').textContent = s ? (s.pausada ? 'En pausa' : tiempo(s.proxima_captura_s)) : '—';
+  $('s-id').textContent = s ? `${s.id} (cada ${s.intervalo} s, promedio cada ${s.periodo_min} min` +
+    (e.mosaico ? `, captura precisa ${e.mosaico}x${e.mosaico})` : ')') : (e.sesion_mostrada ? `Ultima: ${e.sesion_mostrada}` : '—');
+  $('s-proxima').textContent = !s ? '—' : s.procesando_captura ? 'Procesando captura...' :
+    (s.pausada ? 'En pausa' : tiempo(s.proxima_captura_s));
   $('s-periodo').textContent = s && s.periodo_actual ? `${s.periodo_actual} · termina en ${tiempo(s.fin_periodo_s)}` : '—';
   const c = e.calibracion;
   $('s-calib').textContent = !c ? 'Sin calibrar' : (c.forma === 'r' ? `Rectangulo ${c.base_cm} x ${c.altura_cm} cm` : `Circulo, radio ${c.radio_cm} cm`) + ` · ${fmt(c.factor_escala, 4)} cm/px`;

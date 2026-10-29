@@ -325,6 +325,7 @@ Sin configuracion el programa funciona con valores por defecto. Para cambiarlos,
 | `imgsz` | Tamano de entrada al modelo (1024). Con modelo NCNN debe coincidir con el exportado |
 | `ancho`, `alto` | Resolucion pedida a la camara (1280 x 720) |
 | `segundos_entre_detecciones` | Pausa entre detecciones; 1-2 s reduce el uso del procesador sin GPU |
+| `mosaico_capturas` | Captura precisa: ademas de la imagen completa, analiza N x N partes ampliadas. Encuentra muchas mas larvas amontonadas pero tarda (N*N + 1) veces mas, solo en las capturas. 4 por defecto; `0` lo desactiva |
 | `puerto`, `usuario_web`, `clave_web` | Servidor web |
 | `reanudar_muestreo_al_iniciar` | El servidor web retoma el muestreo tras un corte de luz |
 | `modelo` | Ruta a otro modelo (`.pt` o carpeta `_ncnn_model`) |

@@ -23,11 +23,12 @@ import cv2
 # Permite importar nucleo/ al correr el script directamente (python herramientas/...)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from nucleo.configuracion import BASE_DIR
+from nucleo.configuracion import BASE_DIR, CONFIG
 from nucleo.core_detector import DetectorLarvas, MODEL_PATH, CONF_POR_DEFECTO
 
 
-def mascara_a_poligono(mask, ancho, alto):
+def mascara_a_poligono(mask, origen, ancho, alto):
+    """origen: posicion (x, y) en el frame de la esquina de la mascara recortada."""
     contornos, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contornos:
         return None
@@ -36,7 +37,8 @@ def mascara_a_poligono(mask, ancho, alto):
     cnt = cv2.approxPolyDP(cnt, 0.01 * cv2.arcLength(cnt, True), True)
     if len(cnt) < 3:
         return None
-    return [(x / ancho, y / alto) for x, y in cnt.reshape(-1, 2)]
+    ox, oy = origen
+    return [((x + ox) / ancho, (y + oy) / alto) for x, y in cnt.reshape(-1, 2)]
 
 
 def main():
@@ -65,7 +67,8 @@ def main():
         img = cv2.imread(ruta)
         if img is None:
             continue
-        detecciones = detector.detectar(img)
+        # Mismo modo preciso que las capturas: pre-etiqueta mas larvas en los montones
+        detecciones = detector.detectar(img, mosaico=CONFIG['mosaico_capturas'])
         if len(detecciones) >= args.min_larvas:
             candidatas.append((ruta, img.shape, detecciones))
         print(f"\r{i}/{len(rutas)} revisadas, {len(candidatas)} con >= {args.min_larvas} larvas", end='')
@@ -94,7 +97,7 @@ def main():
         for d in detecciones:
             if d['mask'] is None:
                 continue
-            poligono = mascara_a_poligono(d['mask'], ancho, alto)
+            poligono = mascara_a_poligono(d['mask'], d['mask_origen'], ancho, alto)
             if poligono:
                 lineas.append('0 ' + ' '.join(f"{x:.6f} {y:.6f}" for x, y in poligono))
         total += len(lineas)

@@ -25,6 +25,19 @@ class ProcesadorVideo:
         self._hilo = None
         self.segundos_entre_detecciones = CONFIG['segundos_entre_detecciones']
         self._ultima_deteccion = 0
+        self.mosaico = CONFIG['mosaico_capturas']
+        self._pedido_preciso = False
+
+    @property
+    def usa_mosaico(self):
+        return self.mosaico > 1
+
+    def pedir_deteccion_precisa(self):
+        """La proxima deteccion se hace en mosaico (para una captura). El resultado trae 'preciso': True."""
+        self._pedido_preciso = True
+
+    def cancelar_deteccion_precisa(self):
+        self._pedido_preciso = False
 
     def iniciar(self):
         self._activo.set()
@@ -60,14 +73,19 @@ class ProcesadorVideo:
                     self._roi_mask = crear_mascara_roi(frame.shape, calib['forma'], calib['puntos'])
                 roi_mask = self._roi_mask
 
+            preciso = False
             if self.detectar:
+                preciso = self._pedido_preciso and self.usa_mosaico
                 # Se leen todos los frames (asi la imagen siempre es actual), pero se detecta solo cada tanto
-                if time.time() - self._ultima_deteccion < self.segundos_entre_detecciones:
+                if not preciso and time.time() - self._ultima_deteccion < self.segundos_entre_detecciones:
                     continue
                 self._ultima_deteccion = time.time()
                 try:
                     t0 = time.perf_counter()
-                    detecciones = self.detector.detectar(frame, roi_mask=roi_mask)
+                    detecciones = self.detector.detectar(frame, roi_mask=roi_mask,
+                                                         mosaico=self.mosaico if preciso else 1)
+                    if preciso:
+                        self._pedido_preciso = False
                     ms_deteccion = (time.perf_counter() - t0) * 1000
                 except Exception as e:
                     print(f"Error en deteccion: {e}")
@@ -89,5 +107,6 @@ class ProcesadorVideo:
                     'detecciones': detecciones,
                     'roi_mask': roi_mask,
                     'ms_deteccion': ms_deteccion,
+                    'preciso': preciso,
                     't': time.time(),
                 }

@@ -120,6 +120,7 @@ df -h ~                                 # espacio en disco
 | `imgsz` | Tamano de entrada al modelo. Tiene que coincidir con el del modelo NCNN exportado |
 | `conf` | Confianza minima (0.35 con el modelo v2) |
 | `segundos_entre_detecciones` | Pausa entre detecciones. 1-2 s evita tener el procesador al 100% todo el tiempo |
+| `mosaico_capturas` | Captura precisa en N x N partes (encuentra muchas mas larvas amontonadas). En la Pi: 3 = ~10 s por captura, 4 = ~17 s; mientras tanto la vista en vivo se detiene. `0` lo desactiva |
 | `puerto` | Puerto de la pagina web (8000) |
 | `usuario_web`, `clave_web` | Usuario y contrasena de la pagina |
 | `reanudar_muestreo_al_iniciar` | Retomar el muestreo despues de un corte de luz |

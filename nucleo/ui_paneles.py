@@ -322,6 +322,8 @@ class PanelDeteccion(ttk.Frame):
         self.frame_actual = None
         self._ultimo_seq = None
         self._texto_sesion = ""
+        # True mientras el procesador hace la deteccion en mosaico de una captura
+        self._esperando_precisa = False
         self._fuera_roi = None
         self._roi_src = None
         self._rend_seq = None
@@ -495,6 +497,9 @@ class PanelDeteccion(ttk.Frame):
         self.btn_muestreo.config(state='disabled')
         self.btn_pausar.config(state='normal')
         self._texto_sesion = f"Sesion: {sesion_id} | Captura cada {intervalo:g} s | Promedio cada {periodo_min:g} min"
+        if self.procesador.usa_mosaico:
+            self._texto_sesion += f" | Captura precisa (mosaico {self.procesador.mosaico}x{self.procesador.mosaico})"
+        self._esperando_precisa = False
         self.label_estado.config(
             text=f"{self._texto_sesion} | Muestreando... (autoguardado en capturas/{sesion_id}/)"
         )
@@ -515,6 +520,8 @@ class PanelDeteccion(ttk.Frame):
         # Detiene el muestreo pero NO cierra la camara
         self.modo = 'idle'
         self.procesador.detectar = False
+        self.procesador.cancelar_deteccion_precisa()
+        self._esperando_precisa = False
         if self.sesion:
             cerrado = self.sesion.detener()
             if cerrado:
@@ -552,15 +559,24 @@ class PanelDeteccion(ttk.Frame):
         res = self.procesador.ultimo_resultado()
         if res is not None and res['seq'] != self._ultimo_seq and res['detecciones'] is not None:
             self._ultimo_seq = res['seq']
-            if self.modo == 'captura' and self.sesion.debe_capturar():
+            if self.modo == 'captura' and self._esperando_precisa and res.get('preciso'):
+                self._esperando_precisa = False
                 self._procesar_captura(res)
+            elif self.modo == 'captura' and not self._esperando_precisa and self.sesion.debe_capturar():
+                if self.procesador.usa_mosaico:
+                    # La captura se guarda cuando llegue la deteccion en mosaico (tarda unos segundos)
+                    self.procesador.pedir_deteccion_precisa()
+                    self._esperando_precisa = True
+                else:
+                    self._procesar_captura(res)
             else:
                 encabezado = "MUESTREO" if self.modo == 'captura' else "PREVIEW"
                 self.frame_actual = self._anotar(res, res['detecciones'],
                                                  f"{encabezado} | Larvas: {len(res['detecciones'])}",
                                                  completo=False)
                 self.visor.mostrar(self.frame_actual)
-            self._actualizar_rendimiento(res)
+            if not res.get('preciso'):
+                self._actualizar_rendimiento(res)
 
         self._actualizar_cuenta_regresiva()
         self.after(30, self._loop)
@@ -582,6 +598,10 @@ class PanelDeteccion(ttk.Frame):
         if self.modo != 'captura' or self.sesion is None:
             return
         self._actualizar_label_periodo()
+        if self._esperando_precisa:
+            n = self.procesador.mosaico
+            self.label_siguiente.config(text=f"Procesando captura (mosaico {n}x{n})...")
+            return
         restante = self.sesion.segundos_restantes()
         if restante is None:
             self.label_siguiente.config(text="Pausado")

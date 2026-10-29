@@ -25,6 +25,10 @@ POR_DEFECTO = {
     # Pausa minima entre detecciones (s). 0 = lo mas rapido posible. En la Pi conviene ~1-2 s
     # para no tener el procesador al 100% todo el tiempo (la camara se sigue leyendo igual)
     "segundos_entre_detecciones": 0,
+    # Capturas en modo preciso: ademas de la imagen completa se analiza en N x N partes ampliadas.
+    # Encuentra muchas mas larvas amontonadas pero tarda (N*N + 1) veces mas (solo en las capturas,
+    # la vista en vivo sigue rapida). En la Pi: 3 = ~10 s por captura, 4 = ~17 s. 0 o 1 = desactivado
+    "mosaico_capturas": 4,
     # Servidor web
     "puerto": 8000,
     "usuario_web": "larvas",
